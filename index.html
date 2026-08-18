@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Excesso de Estoque &amp; Produtos Sem Venda — Metalkit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#EEF1F4;
+  --surface:#FFFFFF;
+  --surface-alt:#F5F7F9;
+  --border:#DDE2E8;
+  --ink:#1B222C;
+  --ink-soft:#4B5563;
+  --ink-faint:#8A93A1;
+  --steel:#2F6690;
+  --steel-dark:#204A6B;
+  --steel-light:#E5EEF4;
+  --crit:#C0392B;
+  --crit-bg:#FBEAE8;
+  --excesso:#C9760A;
+  --excesso-bg:#FDF1E1;
+  --atencao:#A88A05;
+  --atencao-bg:#FBF3D9;
+  --normal:#1E7A46;
+  --normal-bg:#E5F3EA;
+  --radius:10px;
+  --shadow:0 1px 2px rgba(20,30,45,.05), 0 1px 8px rgba(20,30,45,.04);
+  --font-display:'IBM Plex Sans',-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-display);
+  font-size:14px;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--steel-light);}
+a{color:var(--steel);}
+
+/* ---------- Layout shell ---------- */
+.app{max-width:1440px;margin:0 auto;padding:0 24px 60px;position:relative;z-index:1;}
+/* ---------- Background video ---------- */
+#bgVideo{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  width:100vw;height:100vh;z-index:0;
+  object-fit:cover;object-position:center;
+  opacity:0.15;
+  filter:blur(2px) saturate(0.9);
+  transform:scale(1.02); /* evita bordas transparentes causadas pelo blur */
+  pointer-events:none;
+  display:block;
+  background:var(--bg);
+  transition:opacity .4s ease, filter .4s ease;
+}
+#bgVideoScrim{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  width:100vw;height:100vh;z-index:0;
+  background:var(--bg);
+  opacity:0.45;
+  pointer-events:none;
+  transition:opacity .4s ease;
+}
+/* Na aba Início, o vídeo aparece em resolução/opacidade normal, sem véu */
+body.video-full #bgVideo{opacity:1;filter:none;transform:scale(1);}
+body.video-full #bgVideoScrim{opacity:0;}
+
+/* ---------- Hero (aba Início) ---------- */
+.hero{
+  position:relative;
+  width:100vw;margin-left:calc(50% - 50vw);
+  min-height:calc(100vh - 158px);
+  display:flex;flex-direction:column;justify-content:center;
+  overflow:hidden;padding:64px 8vw 40px;
+  color:#fff;
+}
+.hero-overlay{
+  position:absolute;inset:0;z-index:0;
+  background:linear-gradient(100deg, rgba(12,22,32,.86) 0%, rgba(12,22,32,.62) 42%, rgba(12,22,32,.22) 78%, rgba(12,22,32,.1) 100%);
+}
+.hero-content{position:relative;z-index:1;max-width:640px;}
+.hero-eyebrow{
+  font-size:12px;font-weight:700;letter-spacing:2px;color:#BFD6E6;
+  margin-bottom:14px;text-transform:uppercase;
+}
+.hero-content h1{
+  font-size:clamp(28px,4vw,44px);line-height:1.15;font-weight:700;margin:0 0 18px;
+  text-shadow:0 2px 18px rgba(0,0,0,.25);
+}
+.hero-text{
+  font-size:15px;line-height:1.65;color:rgba(255,255,255,.88);max-width:560px;margin:0 0 22px;
+}
+.hero-pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px;}
+.hero-pill{
+  font-size:11.5px;font-weight:600;padding:6px 13px;border-radius:100px;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);color:#fff;
+  backdrop-filter:blur(2px);
+}
+.hero-actions{display:flex;flex-wrap:wrap;gap:12px;}
+.hero-btn{padding:11px 22px;font-size:13.5px;}
+.hero-btn-ghost{
+  padding:11px 22px;font-size:13.5px;font-weight:600;border-radius:7px;cursor:pointer;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.4);color:#fff;
+  font-family:var(--font-display);
+}
+.hero-btn-ghost:hover{background:rgba(255,255,255,.18);}
+
+.hero-quicklinks{
+  position:relative;z-index:1;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;
+  margin-top:44px;max-width:1000px;
+}
+@media(max-width:900px){.hero-quicklinks{grid-template-columns:repeat(2,1fr);}}
+.hero-tile{
+  text-align:left;cursor:pointer;border-radius:10px;padding:14px 16px;
+  background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.24);
+  backdrop-filter:blur(3px);color:#fff;font-family:var(--font-display);
+  display:flex;flex-direction:column;gap:4px;transition:background .15s,transform .15s;
+}
+.hero-tile:hover{background:rgba(255,255,255,.2);transform:translateY(-1px);}
+.hero-tile .ht-label{font-weight:700;font-size:13.5px;}
+.hero-tile .ht-desc{font-size:11.5px;color:rgba(255,255,255,.75);}
+
+.topbar{
+  position:sticky;top:0;z-index:50;
+  background:linear-gradient(180deg,var(--steel-dark),var(--steel) 130%);
+  color:#fff;
+  padding:18px 28px;
+  display:flex;align-items:center;justify-content:space-between;gap:20px;
+  box-shadow:0 2px 14px rgba(20,40,60,.18);
+}
+.topbar .brandblock{display:flex;align-items:center;gap:14px;}
+.mark{
+  width:38px;height:38px;border-radius:9px;
+  background:repeating-linear-gradient(135deg,#fff 0 3px,transparent 3px 8px);
+  background-color:rgba(255,255,255,.14);
+  border:1.5px solid rgba(255,255,255,.55);
+  flex:0 0 auto;
+}
+.topbar h1{font-size:16.5px;font-weight:600;margin:0;letter-spacing:.2px;}
+.topbar .sub{font-size:12px;color:rgba(255,255,255,.75);margin-top:2px;}
+.topbar .meta{font-size:11.5px;color:rgba(255,255,255,.8);text-align:right;line-height:1.6;}
+.topbar .meta b{color:#fff;font-weight:600;}
+
+.tabs{
+  display:flex;gap:2px;margin:22px 0 20px;
+  background:var(--surface);border:1px solid var(--border);border-radius:11px;
+  padding:4px;width:fit-content;box-shadow:var(--shadow);
+}
+.tab-btn{
+  appearance:none;border:none;background:transparent;cursor:pointer;
+  font-family:var(--font-display);font-weight:600;font-size:13px;color:var(--ink-soft);
+  padding:9px 18px;border-radius:8px;transition:background .15s,color .15s;
+  white-space:nowrap;
+}
+.tab-btn.active{background:var(--steel);color:#fff;}
+.tab-btn:not(.active):hover{background:var(--surface-alt);color:var(--ink);}
+
+.view{display:none;}
+.view.active{display:block;animation:fadein .25s ease;}
+@keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+h2.section-title{
+  font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+  color:var(--ink-soft);margin:32px 0 14px;display:flex;align-items:center;gap:10px;
+}
+h2.section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+h2.section-title .grp-tag{
+  font-size:10.5px;font-weight:700;letter-spacing:.4px;padding:2px 8px;border-radius:100px;
+  background:var(--steel-light);color:var(--steel-dark);text-transform:none;
+}
+
+/* ---------- KPI cards ---------- */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+@media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr);}}
+.kpi{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px 16px;box-shadow:var(--shadow);border-left:3px solid var(--border);
+  position:relative;overflow:hidden;
+}
+.kpi .label{font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.5px;font-weight:600;}
+.kpi .value{font-family:var(--font-mono);font-size:24px;font-weight:600;margin-top:4px;color:var(--ink);}
+.kpi .sub{font-size:11px;color:var(--ink-faint);margin-top:3px;}
+.kpi.tone-crit{border-left-color:var(--crit);}
+.kpi.tone-excesso{border-left-color:var(--excesso);}
+.kpi.tone-normal{border-left-color:var(--normal);}
+.kpi.tone-steel{border-left-color:var(--steel);}
+.kpi.tone-atencao{border-left-color:var(--atencao);}
+
+/* ---------- Charts / panels ---------- */
+.panel-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-top:14px;}
+@media(max-width:980px){.panel-grid{grid-template-columns:1fr;}}
+.panel{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 18px;box-shadow:var(--shadow);
+}
+.panel h3{font-size:13px;margin:0 0 12px;font-weight:700;color:var(--ink);}
+.panel h3 .hint{font-weight:400;color:var(--ink-faint);font-size:11.5px;margin-left:6px;}
+.chart-wrap{position:relative;height:260px;}
+.chart-wrap.short{height:210px;}
+
+.rank-list{list-style:none;margin:0;padding:0;}
+.rank-list li{
+  display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;
+  padding:7px 0;border-bottom:1px solid var(--surface-alt);font-size:12.5px;
+}
+.rank-list li:last-child{border-bottom:none;}
+.rank-list .n{font-family:var(--font-mono);color:var(--ink-faint);font-size:11px;}
+.rank-list .code{font-family:var(--font-mono);font-weight:600;color:var(--ink);}
+.rank-list .desc{color:var(--ink-faint);font-size:11px;display:block;}
+.rank-list .val{font-family:var(--font-mono);font-weight:600;white-space:nowrap;}
+.bar-mini{height:4px;border-radius:3px;background:var(--surface-alt);margin-top:3px;overflow:hidden;}
+.bar-mini i{display:block;height:100%;background:var(--excesso);}
+
+/* ---------- Badges ---------- */
+.badge{
+  display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;
+  padding:3px 9px;border-radius:100px;letter-spacing:.2px;white-space:nowrap;
+}
+.badge::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;}
+.badge.CRIT{background:var(--crit-bg);color:var(--crit);}
+.badge.EXCESSO{background:var(--excesso-bg);color:var(--excesso);}
+.badge.ATENCAO{background:var(--atencao-bg);color:var(--atencao);}
+.badge.NORMAL{background:var(--normal-bg);color:var(--normal);}
+
+/* ---------- Filters ---------- */
+.filters{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px 16px;box-shadow:var(--shadow);
+  display:grid;grid-template-columns:repeat(6,1fr);gap:10px 12px;margin-bottom:14px;
+  position:sticky;top:78px;z-index:20;
+}
+@media(max-width:1200px){.filters{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:700px){.filters{grid-template-columns:repeat(2,1fr);position:static;}}
+.f-field{display:flex;flex-direction:column;gap:4px;}
+.f-field label{font-size:10.5px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.4px;}
+.f-field input,.f-field select{
+  font-family:var(--font-display);font-size:12.5px;padding:7px 9px;border-radius:7px;
+  border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);
+}
+.f-field input:focus,.f-field select:focus{outline:2px solid var(--steel);outline-offset:-1px;background:#fff;}
+.f-actions{display:flex;align-items:flex-end;gap:8px;}
+.btn{
+  font-family:var(--font-display);font-weight:600;font-size:12.5px;cursor:pointer;
+  border-radius:7px;padding:8px 14px;border:1px solid var(--border);background:var(--surface-alt);color:var(--ink-soft);
+}
+.btn:hover{background:#fff;border-color:var(--steel);color:var(--steel-dark);}
+.btn.primary{background:var(--steel);border-color:var(--steel);color:#fff;}
+.btn.primary:hover{background:var(--steel-dark);}
+.result-count{font-size:12px;color:var(--ink-faint);margin:2px 2px 10px;}
+.result-count b{color:var(--ink);}
+
+/* ---------- Table ---------- */
+.table-wrap{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);overflow:auto;
+}
+table{border-collapse:collapse;width:100%;font-size:12.2px;min-width:1180px;}
+thead th{
+  position:sticky;top:0;background:var(--steel-dark);color:#fff;
+  text-align:left;font-weight:600;font-size:10.8px;text-transform:uppercase;letter-spacing:.3px;
+  padding:9px 10px;white-space:nowrap;z-index:5;
+}
+tbody td{padding:8px 10px;border-bottom:1px solid var(--surface-alt);white-space:nowrap;}
+tbody tr:hover{background:var(--surface-alt);}
+tbody tr.row-CRIT{background:var(--crit-bg);}
+tbody tr.row-CRIT:hover{background:#f6dcd8;}
+td.num,th.num{text-align:right;font-family:var(--font-mono);}
+td.code{font-family:var(--font-mono);font-weight:600;}
+td.desc{white-space:normal;min-width:220px;max-width:320px;color:var(--ink-soft);}
+td.cover-cell{min-width:110px;}
+.cover-bar{height:5px;border-radius:3px;background:var(--surface-alt);margin-top:4px;overflow:hidden;width:90px;}
+.cover-bar i{display:block;height:100%;}
+
+.pager{display:flex;align-items:center;justify-content:space-between;padding:12px 4px 0;font-size:12px;color:var(--ink-faint);}
+.pager .btns{display:flex;gap:6px;}
+.pager button{
+  border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:5px 10px;
+  cursor:pointer;font-family:var(--font-mono);font-size:12px;color:var(--ink-soft);
+}
+.pager button:disabled{opacity:.4;cursor:not-allowed;}
+.pager button:not(:disabled):hover{border-color:var(--steel);color:var(--steel-dark);}
+
+/* ---------- Priority section ---------- */
+.priority-toggle{display:flex;gap:8px;margin-bottom:14px;}
+.pill{
+  border:1px solid var(--border);background:var(--surface);border-radius:100px;padding:6px 14px;
+  font-size:12px;font-weight:600;color:var(--ink-soft);cursor:pointer;
+}
+.pill.active{background:var(--steel);color:#fff;border-color:var(--steel);}
+.priority-card{
+  background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--border);
+  border-radius:9px;padding:12px 16px;margin-bottom:8px;box-shadow:var(--shadow);
+  display:grid;grid-template-columns:34px 1fr auto;gap:14px;align-items:center;
+}
+.priority-card.row-CRIT{border-left-color:var(--crit);}
+.priority-card.row-EXCESSO{border-left-color:var(--excesso);}
+.priority-card.row-ATENCAO{border-left-color:var(--atencao);}
+.priority-card .rank-num{
+  font-family:var(--font-mono);font-weight:700;font-size:16px;color:var(--ink-faint);text-align:center;
+}
+.priority-card .info .code{font-family:var(--font-mono);font-weight:700;font-size:13px;}
+.priority-card .info .desc{font-size:12px;color:var(--ink-faint);margin-top:1px;}
+.priority-card .metrics{display:flex;gap:20px;text-align:right;}
+.priority-card .metrics div{display:flex;flex-direction:column;}
+.priority-card .metrics span.mlabel{font-size:9.5px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.3px;}
+.priority-card .metrics span.mval{font-family:var(--font-mono);font-weight:700;font-size:13px;}
+
+/* ---------- Upload ---------- */
+.upload-box{
+  background:var(--surface);border:2px dashed var(--border);border-radius:14px;
+  padding:40px 30px;text-align:center;max-width:640px;margin:20px auto;
+}
+.upload-box h3{margin:0 0 6px;font-size:15px;}
+.upload-box p{color:var(--ink-faint);font-size:12.5px;margin:0 0 18px;}
+.upload-box input[type=file]{display:none;}
+.upload-status{margin-top:16px;font-size:12.5px;color:var(--ink-soft);}
+.upload-status.ok{color:var(--normal);font-weight:600;}
+.upload-status.err{color:var(--crit);font-weight:600;}
+.spec-box{
+  max-width:640px;margin:0 auto;background:var(--surface-alt);border:1px solid var(--border);
+  border-radius:10px;padding:16px 18px;font-size:12px;color:var(--ink-soft);
+}
+.spec-box code{font-family:var(--font-mono);background:#fff;border:1px solid var(--border);border-radius:4px;padding:1px 5px;}
+
+/* ---------- Model cards ---------- */
+.model-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;
+}
+.model-card{
+  background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--border);
+  border-radius:9px;padding:13px 14px;box-shadow:var(--shadow);
+}
+.model-card.top-CRIT{border-top-color:var(--crit);}
+.model-card.top-EXCESSO{border-top-color:var(--excesso);}
+.model-card.top-ATENCAO{border-top-color:var(--atencao);}
+.model-card.top-NORMAL{border-top-color:var(--normal);}
+.model-card .mhead{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:9px;}
+.model-card .mcode{font-family:var(--font-mono);font-weight:700;font-size:14.5px;color:var(--ink);word-break:break-word;}
+.model-card .mgrp{font-size:10px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-top:1px;}
+.model-card .mstats{display:grid;grid-template-columns:1fr 1fr;gap:8px 6px;margin-top:8px;}
+.model-card .mstat .mlabel{font-size:9.5px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.3px;font-weight:600;}
+.model-card .mstat .mval{font-family:var(--font-mono);font-weight:700;font-size:13.5px;color:var(--ink);}
+.model-card .mbreakdown{display:flex;gap:5px;margin-top:10px;flex-wrap:wrap;}
+.model-card .mchip{font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:100px;}
+.model-card .mchip.CRIT{background:var(--crit-bg);color:var(--crit);}
+.model-card .mchip.EXCESSO{background:var(--excesso-bg);color:var(--excesso);}
+.model-card .mchip.ATENCAO{background:var(--atencao-bg);color:var(--atencao);}
+.model-card .mchip.NORMAL{background:var(--normal-bg);color:var(--normal);}
+
+.empty-note{color:var(--ink-faint);font-size:12.5px;padding:30px;text-align:center;}
+footer.appfoot{text-align:center;color:var(--ink-faint);font-size:11px;margin-top:40px;}
+</style>
+</head>
+<body class="video-full">
+<video id="bgVideo" autoplay muted loop playsinline preload="auto" aria-hidden="true">
+  <source type="video/mp4">
+  <!-- o atributo src é definido em tempo de execução a partir de CLIENT_CONFIG.hero.videoSrc -->
+</video>
+<div id="bgVideoScrim" aria-hidden="true"></div>
+
+<div class="topbar">
+  <div class="brandblock">
+    <div class="mark"></div>
+    <div>
+      <h1 id="topbarTitle">Excesso de Estoque &amp; Produtos Sem Venda</h1>
+      <div class="sub" id="topbarSubtitle">Painel de análise — Perfil de Alumínio &amp; Ferragem</div>
+    </div>
+  </div>
+  <div class="meta">
+    Base carregada: <b id="metaFileName">Vendas + Estoque Excesso.xlsx</b><br>
+    Registros: <b id="metaRowCount">–</b> · Atualizado em <b id="metaDate">–</b>
+  </div>
+</div>
+
+<div class="app">
+  <div class="tabs" role="tablist">
+    <button class="tab-btn active" data-tab="home">Início</button>
+    <button class="tab-btn" data-tab="overview">Visão Geral</button>
+    <button class="tab-btn" data-tab="priority">Prioridades de Ação</button>
+    <button class="tab-btn" data-tab="models">Modelos (sem cor)</button>
+    <button class="tab-btn" data-tab="table">Tabela Detalhada</button>
+    <button class="tab-btn" data-tab="upload">Atualizar Dados</button>
+  </div>
+
+  <!-- ===================== INÍCIO (institucional) ===================== -->
+  <section id="view-home" class="view active">
+    <div class="hero">
+      <div class="hero-overlay"></div>
+      <div class="hero-content">
+        <div class="hero-eyebrow" id="heroEyebrow">METALKIT</div>
+        <h1 id="heroTitle">Excelência em perfis de alumínio<br>e ferragens para esquadrias</h1>
+        <!-- TEXTO INSTITUCIONAL — vem de CLIENT_CONFIG.hero.text; edite lá, não aqui -->
+        <p class="hero-text" id="heroText">
+          A Metalkit atua na distribuição e fabricação de perfis de alumínio e acessórios
+          para esquadrias, atendendo o mercado com qualidade, agilidade e um portfólio
+          amplo de Linhas de perfis e ferragens. Este painel reúne a inteligência de dados
+          por trás da nossa operação de estoque, produção e suprimentos — apoiando decisões
+          mais rápidas e precisas em toda a cadeia.
+        </p>
+        <div class="hero-pills" id="heroPills">
+          <span class="hero-pill">Perfis de Alumínio</span>
+          <span class="hero-pill">Ferragens &amp; Acessórios</span>
+          <span class="hero-pill">Inteligência de Dados &amp; BI</span>
+        </div>
+        <div class="hero-actions">
+          <button class="btn primary hero-btn" data-goto="overview">Acessar o Dashboard</button>
+          <button class="btn hero-btn-ghost" data-goto="priority">Ver Prioridades de Ação</button>
+        </div>
+      </div>
+      <div class="hero-quicklinks">
+        <button class="hero-tile" data-goto="overview">
+          <span class="ht-label">Visão Geral</span>
+          <span class="ht-desc">Indicadores, gráficos e rankings</span>
+        </button>
+        <button class="hero-tile" data-goto="priority">
+          <span class="ht-label">Prioridades de Ação</span>
+          <span class="ht-desc">O que resolver primeiro</span>
+        </button>
+        <button class="hero-tile" data-goto="models">
+          <span class="ht-label">Modelos (sem cor)</span>
+          <span class="ht-desc">Visão consolidada por modelo</span>
+        </button>
+        <button class="hero-tile" data-goto="table">
+          <span class="ht-label">Tabela Detalhada</span>
+          <span class="ht-desc">Todos os itens, com filtros</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== VISÃO GERAL ===================== -->
+  <section id="view-overview" class="view">
+
+    <h2 class="section-title">Painel executivo <span class="grp-tag" id="ovTotalTag">–</span></h2>
+    <div class="kpi-grid" id="kpiTotalGrid"></div>
+
+    <div class="panel-grid">
+      <div class="panel">
+        <h3>Classificação da carteira <span class="hint">quantidade de SKUs por status</span></h3>
+        <div class="chart-wrap"><canvas id="chartClass"></canvas></div>
+      </div>
+      <div class="panel">
+        <h3>Perfis × Ferragens <span class="hint">onde o problema é maior</span></h3>
+        <div class="chart-wrap"><canvas id="chartCompare"></canvas></div>
+      </div>
+    </div>
+
+    <h2 class="section-title">Indicadores por grupo</h2>
+    <div class="panel-grid" style="grid-template-columns:1fr 1fr;">
+      <div>
+        <h3 class="js-group-a-label" data-plural="1" style="font-size:12px;font-weight:700;color:var(--steel-dark);margin:0 0 10px;text-transform:uppercase;">PERFIS</h3>
+        <div class="kpi-grid" id="kpiPerfilGrid"></div>
+      </div>
+      <div>
+        <h3 class="js-group-b-label" data-plural="1" style="font-size:12px;font-weight:700;color:var(--steel-dark);margin:0 0 10px;text-transform:uppercase;">FERRAGENS</h3>
+        <div class="kpi-grid" id="kpiFerragemGrid"></div>
+      </div>
+    </div>
+
+    <div class="panel-grid">
+      <div class="panel">
+        <h3>Ranking — maior excesso de estoque <span class="hint">top 10</span></h3>
+        <ul class="rank-list" id="rankExcesso"></ul>
+      </div>
+      <div class="panel">
+        <h3>Ranking — sem venda com maior estoque <span class="hint">top 10</span></h3>
+        <ul class="rank-list" id="rankSemVenda"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== PRIORIDADES ===================== -->
+  <section id="view-priority" class="view">
+    <h2 class="section-title">Prioridades de ação</h2>
+    <p style="color:var(--ink-soft);font-size:12.5px;max-width:760px;margin:-6px 0 16px;">
+      Ordenação: 1) sem venda com maior estoque disponível · 2) maior excesso de estoque ·
+      3) maior cobertura em dias · 4) maior quantidade absoluta em estoque.
+    </p>
+    <div class="priority-toggle" id="priorityGroupToggle">
+      <button class="pill active" data-grp="TODOS">Todos</button>
+      <button class="pill js-group-a-key" data-grp="Perfil Aluminio"><span class="js-group-a-label" data-plural="1">Perfis</span></button>
+      <button class="pill js-group-b-key" data-grp="Ferragem"><span class="js-group-b-label" data-plural="1">Ferragens</span></button>
+    </div>
+    <div id="priorityList"></div>
+  </section>
+
+  <!-- ===================== MODELOS (SEM COR) ===================== -->
+  <section id="view-models" class="view">
+    <h2 class="section-title">Modelos, desconsiderando a cor</h2>
+    <p style="color:var(--ink-soft);font-size:12.5px;max-width:820px;margin:-6px 0 16px;">
+      Agrupamento pelo código-base do item, removendo variações de cor/pintura (ex.: <code style="font-family:var(--font-mono);background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:1px 5px;">MK-47 PT</code>, <code style="font-family:var(--font-mono);background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:1px 5px;">MK-47 NT</code> e <code style="font-family:var(--font-mono);background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:1px 5px;">MK-47 BZ</code> contam como um único modelo: <code style="font-family:var(--font-mono);background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:1px 5px;">MK-47</code>). A identificação da cor combina o próprio código e os termos de cor presentes na descrição. Um modelo herda o status mais crítico entre suas cores.
+    </p>
+
+    <div class="priority-toggle" id="modelGroupToggle">
+      <button class="pill active" data-grp="TODOS">Todos</button>
+      <button class="pill js-group-a-key" data-grp="Perfil Aluminio"><span class="js-group-a-label" data-plural="1">Perfis</span></button>
+      <button class="pill js-group-b-key" data-grp="Ferragem"><span class="js-group-b-label" data-plural="1">Ferragens</span></button>
+    </div>
+
+    <div class="kpi-grid" id="kpiModelsGrid" style="margin-bottom:18px;"></div>
+
+    <div class="filters" style="grid-template-columns:repeat(4,1fr);position:static;">
+      <div class="f-field">
+        <label>Buscar modelo</label>
+        <input type="text" id="mSearch" placeholder="Ex.: MK-47">
+      </div>
+      <div class="f-field">
+        <label>Classificação</label>
+        <select id="mClass">
+          <option value="TODOS">Todas</option>
+          <option value="CRIT">Crítico / Sem venda</option>
+          <option value="EXCESSO">Excesso</option>
+          <option value="ATENCAO">Atenção</option>
+          <option value="NORMAL">Normal</option>
+        </select>
+      </div>
+      <div class="f-field">
+        <label>Ordenar por</label>
+        <select id="mSort">
+          <option value="estoque">Maior estoque total</option>
+          <option value="excesso">Maior excesso total</option>
+          <option value="cores">Mais cores/variações</option>
+          <option value="modelo">Modelo (A–Z)</option>
+        </select>
+      </div>
+      <div class="f-actions">
+        <button class="btn primary" id="mApply">Aplicar</button>
+        <button class="btn" id="mReset">Limpar</button>
+      </div>
+    </div>
+    <div class="result-count" id="modelResultCount"></div>
+
+    <div class="model-grid" id="modelGrid"></div>
+    <div class="pager">
+      <span id="mPagerInfo"></span>
+      <div class="btns">
+        <button id="mpgFirst">«</button>
+        <button id="mpgPrev">‹ Anterior</button>
+        <button id="mpgNext">Próxima ›</button>
+        <button id="mpgLast">»</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TABELA DETALHADA ===================== -->
+  <section id="view-table" class="view">
+    <h2 class="section-title">Tabela detalhada</h2>
+    <div class="filters">
+      <div class="f-field">
+        <label>Grupo</label>
+        <select id="fGrupo">
+          <option value="TODOS">Todos</option>
+          <option value="Perfil Aluminio" id="fGrupoOptA">Perfil</option>
+          <option value="Ferragem" id="fGrupoOptB">Ferragem</option>
+        </select>
+      </div>
+      <div class="f-field">
+        <label>Classificação</label>
+        <select id="fClass">
+          <option value="TODOS">Todas</option>
+          <option value="CRIT">Crítico / Sem venda</option>
+          <option value="EXCESSO">Excesso</option>
+          <option value="ATENCAO">Atenção</option>
+          <option value="NORMAL">Normal</option>
+        </select>
+      </div>
+      <div class="f-field">
+        <label>Código</label>
+        <input type="text" id="fCodigo" placeholder="Buscar código...">
+      </div>
+      <div class="f-field">
+        <label>Descrição</label>
+        <input type="text" id="fDesc" placeholder="Buscar descrição...">
+      </div>
+      <div class="f-field">
+        <label>Estoque mín.</label>
+        <input type="number" id="fEstMin" placeholder="0">
+      </div>
+      <div class="f-field">
+        <label>Estoque máx.</label>
+        <input type="number" id="fEstMax" placeholder="—">
+      </div>
+      <div class="f-field">
+        <label>Situação de venda</label>
+        <select id="fVenda">
+          <option value="TODOS">Todos</option>
+          <option value="COM">Com venda (90d)</option>
+          <option value="SEM">Sem venda (90/180/360)</option>
+        </select>
+      </div>
+      <div class="f-field">
+        <label>Excesso</label>
+        <select id="fExcesso">
+          <option value="TODOS">Todos</option>
+          <option value="SIM">Somente com excesso</option>
+        </select>
+      </div>
+      <div class="f-field">
+        <label>Ordenar por</label>
+        <select id="fSort">
+          <option value="estoque">Maior estoque</option>
+          <option value="excesso">Maior excesso</option>
+          <option value="cobertura">Maior cobertura</option>
+          <option value="venda">Menor venda (90d)</option>
+          <option value="codigo">Código (A–Z)</option>
+        </select>
+      </div>
+      <div class="f-actions">
+        <button class="btn primary" id="btnApply">Aplicar filtros</button>
+        <button class="btn" id="btnReset">Limpar</button>
+      </div>
+    </div>
+    <div class="result-count" id="resultCount"></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Grupo</th>
+            <th>Código</th>
+            <th>Descrição</th>
+            <th class="num">Disponível</th>
+            <th class="num">Mínimo</th>
+            <th class="num">Comprado</th>
+            <th class="num">Previsto</th>
+            <th class="num">Venda 90d</th>
+            <th class="num">Venda 180d</th>
+            <th class="num">Venda 360d</th>
+            <th class="num">VMD</th>
+            <th>Cobertura</th>
+            <th class="num">Venda equiv.</th>
+            <th class="num">Excesso (qtd)</th>
+            <th>Classificação</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <span id="pagerInfo"></span>
+      <div class="btns">
+        <button id="pgFirst">«</button>
+        <button id="pgPrev">‹ Anterior</button>
+        <button id="pgNext">Próxima ›</button>
+        <button id="pgLast">»</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== UPLOAD ===================== -->
+  <section id="view-upload" class="view">
+    <h2 class="section-title">Atualizar dados</h2>
+    <div class="upload-box">
+      <h3>Carregar nova planilha</h3>
+      <p id="uploadIntroText">Envie um arquivo .xlsx ou .csv com as abas <code>PERFIL</code> e <code>FERRAGEM</code>, seguindo a mesma estrutura de colunas da base atual. Os dados originais desta sessão não são alterados até a confirmação do carregamento.</p>
+      <button class="btn primary" id="btnPickFile">Selecionar arquivo</button>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      <div class="upload-status" id="uploadStatus"></div>
+    </div>
+    <div class="spec-box">
+      <b>Colunas esperadas</b> (nesta ordem, em cada aba configurada):<br><br>
+      <span id="uploadColumnsList"><code>Grupo</code> · <code>Código</code> · <code>Descrição</code> · <code>Disponível</code> ·
+      <code>Comprado</code> · <code>Previsto</code> · <code>Mínimo</code> · <code>Qtde Venda 90d</code> ·
+      <code>Qtde Venda 180d</code> · <code>Qtde Venda 360d</code> · <code>Excesso Estoque?</code> · <code>VMD</code></span>
+      <br><br>
+      Após o carregamento, o sistema recalcula automaticamente todas as classificações, indicadores, gráficos, rankings e a tabela — usando as mesmas regras aplicadas à base atual. A coluna de excesso original é mantida apenas como referência dos dados importados e não é usada no recálculo.
+    </div>
+  </section>
+
+  <footer class="appfoot">Regras de classificação recalculadas a partir de Disponível, Mínimo, VMD e histórico de vendas — não considera a coluna de excesso original da planilha.</footer>
+</div>
+
+<script>
+/* =================================================================
+   0. CLIENT_CONFIG — ÚNICO BLOCO QUE MUDA POR CLIENTE
+   Para replicar este dashboard para outro cliente, edite APENAS este
+   objeto (+ troque o arquivo de vídeo/logo e os dados na seção 1).
+   Nenhuma outra parte do código deste arquivo precisa ser tocada.
+   ================================================================= */
+const CLIENT_CONFIG = {
+  companyName: "Vitrium",
+  pageTitle: "Excesso de Estoque & Produtos Sem Venda — Vitrium Esquadrias PVC",
+  topbarTitle: "Excesso de Estoque & Produtos Sem Venda",
+  topbarSubtitle: "Painel de análise — Perfil PVC & Ferragens",
+
+  // Cores de marca (aplicadas via CSS custom properties em tempo de execução)
+  brand: {
+    steel: "#1F7A5C",
+    steelDark: "#14563F",
+    steelLight: "#DFF0E8"
+  },
+
+  // Tela inicial (aba "Início")
+  hero: {
+    eyebrow: "VITRIUM",
+    titleHtml: "Perfis de PVC e ferragens<br>para esquadrias de alta performance",
+    text: "A Vitrium é distribuidora especializada em perfis de PVC e ferragens para esquadrias, com portfólio amplo de linhas e acabamentos. Este painel reúne a inteligência de dados por trás da nossa operação de estoque e suprimentos — apoiando decisões mais rápidas e precisas em toda a cadeia.",
+    pills: ["Perfis de PVC", "Ferragens para Esquadrias", "Inteligência de Dados & BI"],
+    videoSrc: "pvc-profiles-bg.mp4"
+  },
+
+  // As duas categorias de produto analisadas. sheetNames = nomes de aba aceitos
+  // no Excel (case-insensitive) para identificar cada grupo no upload.
+  // coverageDays = quantos dias de venda equivalente definem "excesso" no grupo.
+  groups: [
+    { key: "PERFIL_PVC", label: "Perfil PVC", sheetNames: ["PERFIL_PVC"], coverageDays: 90 },
+    { key: "FERRAGENS",  label: "Ferragens",   sheetNames: ["FERRAGENS"],  coverageDays: 60 }
+  ],
+
+  // Reconhecimento de cor para a aba "Modelos (sem cor)" — ajustado à
+  // convenção de nomenclatura de SKU da Vitrium (cores de PVC/ferragem)
+  colorTokens: ['BR','CZ','PT','MD','NG','CH','INOX',
+    'BRANCO','CINZA','PRETO','MADEIRADO','NOGUEIRA','CHAMPANHE'],
+  colorPhrases: [['MADEIRADO','CARVALHO']],
+  colorGluedSuffixes: ['BR','CZ','PT','MD','NG','CH'],
+
+  // Nomes das colunas esperadas no Excel da Vitrium — DELIBERADAMENTE diferentes
+  // dos nomes usados pela Metalkit, para validar que o columnMap funciona
+  columnMap: {
+    grupo: "Categoria", codigo: "SKU", descricao: "Descrição do Item", disponivel: "Estoque Atual",
+    comprado: "Em Compra", previsto: "Previsão Entrada", minimo: "Estoque Mín",
+    venda90: "Venda 90 dias", venda180: "Venda 180 dias", venda360: "Venda 360 dias",
+    excessoOriginal: "Status Excesso", vmd: "Média Diária"
+  }
+};
+const GROUP_A = CLIENT_CONFIG.groups[0];
+const GROUP_B = CLIENT_CONFIG.groups[1];
+
+/* =================================================================
+   1. DADOS EMBUTIDOS (base original)
+   Formato compacto por linha, chaveado pelo nome da aba do Excel:
+   [grupo, codigo, descricao, disponivel, comprado, previsto, minimo, v90, v180, v360, excessoOrig, vmd]
+   v90/v180/v360 = número OU "SV" (Sem Venda)
+   ================================================================= */
+const RAW_DATA = {"PERFIL_PVC":[["Perfil PVC","VT-101 BR","PERFIL PVC LINHA 101 COR BRANCO BARRA 6000MM",677,26,69,48,"SV","SV","SV","SIM",0],["Perfil PVC","VT-101 CZ","PERFIL PVC LINHA 101 COR CINZA BARRA 6000MM",324,6,71,47,"SV","SV","SV","SIM",0],["Perfil PVC","VT-101 PT","PERFIL PVC LINHA 101 COR PRETO BARRA 6000MM",141,108,43,48,0,59,59,"SIM",0],["Perfil PVC","VT-101 MD","PERFIL PVC LINHA 101 COR MADEIRADO CARVALHO BARRA 6000MM",193,24,45,47,"SV","SV","SV","SIM",0],["Perfil PVC","VT-101 CH","PERFIL PVC LINHA 101 COR CHAMPANHE BARRA 6000MM",315,92,73,25,240,503,1105,"SIM",2.95],["Perfil PVC","VT-102 BR","PERFIL PVC LINHA 102 COR BRANCO BARRA 6000MM",866,93,20,118,523,1032,2077,"SIM",5.68],["Perfil PVC","VT-102 CZ","PERFIL PVC LINHA 102 COR CINZA BARRA 6000MM",567,136,31,46,51,196,347,"SIM",0.88],["Perfil PVC","VT-102 PT","PERFIL PVC LINHA 102 COR PRETO BARRA 6000MM",0,8,40,101,971,1962,3875,"NAO",10.76],["Perfil PVC","VT-102 MD","PERFIL PVC LINHA 102 COR MADEIRADO CARVALHO BARRA 6000MM",282,101,58,28,544,978,2057,"SIM",5.53],["Perfil PVC","VT-102 NG","PERFIL PVC LINHA 102 COR NOGUEIRA BARRA 6000MM",769,149,54,88,"SV","SV","SV","SIM",0],["Perfil PVC","VT-110 BR","PERFIL PVC LINHA 110 COR BRANCO BARRA 6000MM",632,108,76,85,1388,2714,5564,"SIM",15.41],["Perfil PVC","VT-110 CZ","PERFIL PVC LINHA 110 COR CINZA BARRA 6000MM",569,141,1,68,"SV","SV","SV","SIM",0],["Perfil PVC","VT-110 PT","PERFIL PVC LINHA 110 COR PRETO BARRA 6000MM",177,87,14,34,"SV","SV","SV","SIM",0],["Perfil PVC","VT-110 MD","PERFIL PVC LINHA 110 COR MADEIRADO CARVALHO BARRA 6000MM",5,45,64,40,14,14,58,"NAO",0],["Perfil PVC","VT-120 BR","PERFIL PVC LINHA 120 COR BRANCO BARRA 6000MM",91,82,62,39,26,63,98,"SIM",0],["Perfil PVC","VT-120 CZ","PERFIL PVC LINHA 120 COR CINZA BARRA 6000MM",32,20,10,66,719,1547,3017,"NAO",8.28],["Perfil PVC","VT-120 PT","PERFIL PVC LINHA 120 COR PRETO BARRA 6000MM",789,108,27,88,15,24,24,"SIM",0],["Perfil PVC","VT-120 CH","PERFIL PVC LINHA 120 COR CHAMPANHE BARRA 6000MM",315,30,31,111,60,60,60,"SIM",0],["Perfil PVC","VT-205 BR","PERFIL PVC LINHA 205 COR BRANCO BARRA 6000MM",154,8,42,49,703,1346,2706,"SIM",7.47],["Perfil PVC","VT-205 CZ","PERFIL PVC LINHA 205 COR CINZA BARRA 6000MM",447,147,60,50,272,490,898,"SIM",2.78],["Perfil PVC","VT-205 PT","PERFIL PVC LINHA 205 COR PRETO BARRA 6000MM",47,110,45,32,"SV","SV","SV","SIM",0],["Perfil PVC","VT-205 MD","PERFIL PVC LINHA 205 COR MADEIRADO CARVALHO BARRA 6000MM",0,27,31,106,415,830,1665,"NAO",4.66],["Perfil PVC","VT-205 NG","PERFIL PVC LINHA 205 COR NOGUEIRA BARRA 6000MM",0,63,9,88,"SV","SV","SV","NAO",0],["Perfil PVC","VT-205 CH","PERFIL PVC LINHA 205 COR CHAMPANHE BARRA 6000MM",516,60,21,90,705,1390,2756,"SIM",7.65],["Perfil PVC","VT-210 BR","PERFIL PVC LINHA 210 COR BRANCO BARRA 6000MM",0,0,49,27,"SV","SV","SV","NAO",0],["Perfil PVC","VT-210 CZ","PERFIL PVC LINHA 210 COR CINZA BARRA 6000MM",481,48,37,74,0,0,0,"SIM",0],["Perfil PVC","VT-210 PT","PERFIL PVC LINHA 210 COR PRETO BARRA 6000MM",56,128,67,27,0,37,37,"SIM",0],["Perfil PVC","VT-210 MD","PERFIL PVC LINHA 210 COR MADEIRADO CARVALHO BARRA 6000MM",538,17,30,43,"SV","SV","SV","SIM",0],["Perfil PVC","VT-210 NG","PERFIL PVC LINHA 210 COR NOGUEIRA BARRA 6000MM",824,66,26,94,153,315,620,"SIM",1.87],["Perfil PVC","VT-210 CH","PERFIL PVC LINHA 210 COR CHAMPANHE BARRA 6000MM",186,18,1,60,357,666,1391,"SIM",3.75],["Perfil PVC","VT-300 BR","PERFIL PVC LINHA 300 COR BRANCO BARRA 6000MM",1565,62,47,29,294,609,1209,"SIM",3.39],["Perfil PVC","VT-300 CZ","PERFIL PVC LINHA 300 COR CINZA BARRA 6000MM",507,2,70,76,534,1166,2240,"SIM",6.24],["Perfil PVC","VT-300 PT","PERFIL PVC LINHA 300 COR PRETO BARRA 6000MM",0,27,70,37,"SV","SV","SV","NAO",0],["Perfil PVC","VT-300 MD","PERFIL PVC LINHA 300 COR MADEIRADO CARVALHO BARRA 6000MM",352,67,64,63,"SV","SV","SV","SIM",0],["Perfil PVC","VT-300 NG","PERFIL PVC LINHA 300 COR NOGUEIRA BARRA 6000MM",960,67,20,31,2,2,2,"SIM",0],["Perfil PVC","VT-300 CH","PERFIL PVC LINHA 300 COR CHAMPANHE BARRA 6000MM",560,38,69,90,"SV","SV","SV","SIM",0],["Perfil PVC","VT-310 BR","PERFIL PVC LINHA 310 COR BRANCO BARRA 6000MM",0,78,46,67,"SV","SV","SV","NAO",0],["Perfil PVC","VT-310 CH","PERFIL PVC LINHA 310 COR CHAMPANHE BARRA 6000MM",301,39,30,51,152,393,577,"SIM",1.87],["Perfil PVC","VT-400 NG","PERFIL PVC LINHA 400 COR NOGUEIRA BARRA 6000MM",373,27,48,72,57,57,123,"SIM",0.37],["Perfil PVC","VT-410 CZ","PERFIL PVC LINHA 410 COR CINZA BARRA 6000MM",1012,102,42,78,30,30,72,"SIM",0],["Perfil PVC","VT-410 PT","PERFIL PVC LINHA 410 COR PRETO BARRA 6000MM",946,29,33,64,498,1138,2062,"SIM",6.05],["Perfil PVC","VT-410 MD","PERFIL PVC LINHA 410 COR MADEIRADO CARVALHO BARRA 6000MM",213,130,14,53,733,1461,2856,"SIM",8.08],["Perfil PVC","VT-410 NG","PERFIL PVC LINHA 410 COR NOGUEIRA BARRA 6000MM",162,50,46,110,167,400,767,"SIM",2.26],["Perfil PVC","VT-410 CH","PERFIL PVC LINHA 410 COR CHAMPANHE BARRA 6000MM",0,129,39,105,688,1449,2883,"NAO",7.8],["Perfil PVC","VT-500 BR","PERFIL PVC LINHA 500 COR BRANCO BARRA 6000MM",150,107,48,90,"SV","SV","SV","SIM",0],["Perfil PVC","VT-500 CZ","PERFIL PVC LINHA 500 COR CINZA BARRA 6000MM",796,82,59,58,74,109,284,"SIM",0.73],["Perfil PVC","VT-500 PT","PERFIL PVC LINHA 500 COR PRETO BARRA 6000MM",995,21,36,106,418,797,1554,"SIM",4.4],["Perfil PVC","VT-500 MD","PERFIL PVC LINHA 500 COR MADEIRADO CARVALHO BARRA 6000MM",187,79,28,116,"SV","SV","SV","SIM",0],["Perfil PVC","VT-500 CH","PERFIL PVC LINHA 500 COR CHAMPANHE BARRA 6000MM",1363,98,63,98,592,1162,2274,"SIM",6.38],["Perfil PVC","VT-510 BR","PERFIL PVC LINHA 510 COR BRANCO BARRA 6000MM",232,108,28,38,294,593,1160,"SIM",3.29],["Perfil PVC","VT-510 CZ","PERFIL PVC LINHA 510 COR CINZA BARRA 6000MM",808,135,71,26,224,424,901,"SIM",2.4],["Perfil PVC","VT-510 PT","PERFIL PVC LINHA 510 COR PRETO BARRA 6000MM",690,140,57,116,634,1246,2603,"SIM",7.24],["Perfil PVC","VT-510 NG","PERFIL PVC LINHA 510 COR NOGUEIRA BARRA 6000MM",132,112,9,51,347,758,1377,"SIM",3.93],["Perfil PVC","VT-510 CH","PERFIL PVC LINHA 510 COR CHAMPANHE BARRA 6000MM",425,39,27,50,294,568,1136,"SIM",3.08],["Perfil PVC","VT-600 BR","PERFIL PVC LINHA 600 COR BRANCO BARRA 6000MM",33,107,49,73,"SV","SV","SV","NAO",0],["Perfil PVC","VT-600 PT","PERFIL PVC LINHA 600 COR PRETO BARRA 6000MM",168,107,68,117,0,10,10,"SIM",0],["Perfil PVC","VT-600 MD","PERFIL PVC LINHA 600 COR MADEIRADO CARVALHO BARRA 6000MM",731,99,43,89,481,1039,2145,"SIM",5.8],["Perfil PVC","VT-600 NG","PERFIL PVC LINHA 600 COR NOGUEIRA BARRA 6000MM",567,6,10,79,24,24,55,"SIM",0],["Perfil PVC","VT-600 CH","PERFIL PVC LINHA 600 COR CHAMPANHE BARRA 6000MM",141,83,27,37,"SV","SV","SV","SIM",0],["Perfil PVC","VT-610 BR","PERFIL PVC LINHA 610 COR BRANCO BARRA 6000MM",235,20,60,63,317,684,1313,"SIM",3.74],["Perfil PVC","VT-610 CZ","PERFIL PVC LINHA 610 COR CINZA BARRA 6000MM",0,17,5,64,"SV","SV","SV","NAO",0],["Perfil PVC","VT-610 NG","PERFIL PVC LINHA 610 COR NOGUEIRA BARRA 6000MM",599,94,21,36,374,724,1316,"SIM",3.76],["Perfil PVC","VT-610 CH","PERFIL PVC LINHA 610 COR CHAMPANHE BARRA 6000MM",458,79,13,115,"SV","SV","SV","SIM",0],["Perfil PVC","VT-700 BR","PERFIL PVC LINHA 700 COR BRANCO BARRA 6000MM",0,62,13,59,0,18,18,"NAO",0],["Perfil PVC","VT-700 CZ","PERFIL PVC LINHA 700 COR CINZA BARRA 6000MM",230,17,64,35,763,1533,3002,"SIM",8.54],["Perfil PVC","VT-700 PT","PERFIL PVC LINHA 700 COR PRETO BARRA 6000MM",294,92,58,21,"SV","SV","SV","SIM",0],["Perfil PVC","VT-700 MD","PERFIL PVC LINHA 700 COR MADEIRADO CARVALHO BARRA 6000MM",0,123,59,75,507,921,1869,"NAO",5.4],["Perfil PVC","VT-700 NG","PERFIL PVC LINHA 700 COR NOGUEIRA BARRA 6000MM",367,97,43,51,102,167,272,"SIM",0.75],["Perfil PVC","VT-700 CH","PERFIL PVC LINHA 700 COR CHAMPANHE BARRA 6000MM",791,70,71,61,417,776,1706,"SIM",4.5],["Perfil PVC","VT-710 BR","PERFIL PVC LINHA 710 COR BRANCO BARRA 6000MM",540,114,2,112,258,537,1012,"SIM",3.03],["Perfil PVC","VT-710 CZ","PERFIL PVC LINHA 710 COR CINZA BARRA 6000MM",482,88,54,48,129,215,528,"SIM",1.34],["Perfil PVC","VT-710 MD","PERFIL PVC LINHA 710 COR MADEIRADO CARVALHO BARRA 6000MM",170,30,24,59,"SV","SV","SV","SIM",0],["Perfil PVC","VT-710 NG","PERFIL PVC LINHA 710 COR NOGUEIRA BARRA 6000MM",361,55,61,108,"SV","SV","SV","SIM",0],["Perfil PVC","VT-710 CH","PERFIL PVC LINHA 710 COR CHAMPANHE BARRA 6000MM",0,3,68,96,41,72,126,"NAO",0.34],["Perfil PVC","VT-800 BR","PERFIL PVC LINHA 800 COR BRANCO BARRA 6000MM",617,125,13,25,706,1462,2912,"SIM",7.89],["Perfil PVC","VT-800 PT","PERFIL PVC LINHA 800 COR PRETO BARRA 6000MM",29,125,9,43,379,819,1533,"NAO",4.22],["Perfil PVC","VT-800 MD","PERFIL PVC LINHA 800 COR MADEIRADO CARVALHO BARRA 6000MM",484,30,71,107,487,936,2087,"SIM",5.38],["Perfil PVC","VT-800 CH","PERFIL PVC LINHA 800 COR CHAMPANHE BARRA 6000MM",463,145,79,86,111,180,343,"SIM",1.08],["Perfil PVC","VT-810 BR","PERFIL PVC LINHA 810 COR BRANCO BARRA 6000MM",204,61,22,114,768,1496,3015,"SIM",8.32],["Perfil PVC","VT-810 CZ","PERFIL PVC LINHA 810 COR CINZA BARRA 6000MM",598,116,9,108,580,1189,2315,"SIM",6.49],["Perfil PVC","VT-810 PT","PERFIL PVC LINHA 810 COR PRETO BARRA 6000MM",0,139,28,53,391,865,1652,"NAO",4.65],["Perfil PVC","VT-810 MD","PERFIL PVC LINHA 810 COR MADEIRADO CARVALHO BARRA 6000MM",949,78,76,29,"SV","SV","SV","SIM",0],["Perfil PVC","VT-810 NG","PERFIL PVC LINHA 810 COR NOGUEIRA BARRA 6000MM",138,112,10,35,198,439,812,"SIM",2.28],["Perfil PVC","VT-810 CH","PERFIL PVC LINHA 810 COR CHAMPANHE BARRA 6000MM",831,58,73,75,"SV","SV","SV","SIM",0],["Perfil PVC","VT-900 BR","PERFIL PVC LINHA 900 COR BRANCO BARRA 6000MM",0,10,22,22,"SV","SV","SV","NAO",0],["Perfil PVC","VT-900 CZ","PERFIL PVC LINHA 900 COR CINZA BARRA 6000MM",398,23,60,103,83,104,345,"SIM",0.86],["Perfil PVC","VT-900 PT","PERFIL PVC LINHA 900 COR PRETO BARRA 6000MM",139,140,4,40,715,1418,2969,"SIM",8.01],["Perfil PVC","VT-900 MD","PERFIL PVC LINHA 900 COR MADEIRADO CARVALHO BARRA 6000MM",183,0,69,60,322,661,1179,"SIM",3.47],["Perfil PVC","VT-900 NG","PERFIL PVC LINHA 900 COR NOGUEIRA BARRA 6000MM",798,73,56,99,418,847,1785,"SIM",4.91],["Perfil PVC","VT-910 BR","PERFIL PVC LINHA 910 COR BRANCO BARRA 6000MM",823,40,39,23,"SV","SV","SV","SIM",0],["Perfil PVC","VT-910 CZ","PERFIL PVC LINHA 910 COR CINZA BARRA 6000MM",319,39,63,90,134,308,586,"SIM",1.41],["Perfil PVC","VT-910 MD","PERFIL PVC LINHA 910 COR MADEIRADO CARVALHO BARRA 6000MM",299,130,17,81,1,39,39,"SIM",0.01],["Perfil PVC","VT-910 CH","PERFIL PVC LINHA 910 COR CHAMPANHE BARRA 6000MM",927,0,36,73,"SV","SV","SV","SIM",0]],"FERRAGENS":[["Ferragens","FR-10 BR","FERRAGEM DOBRADICA MOD 10 COR BRANCO",920,85,70,95,0,0,18,"SIM",0],["Ferragens","FR-10 CZ","FERRAGEM DOBRADICA MOD 10 COR CINZA",1044,98,29,109,"SV","SV","SV","SIM",0],["Ferragens","FR-11 BR","FERRAGEM DOBRADICA MOD 11 COR BRANCO",235,9,16,68,619,1230,2614,"SIM",7.1],["Ferragens","FR-11 PT","FERRAGEM DOBRADICA MOD 11 COR PRETO",350,3,18,95,251,541,1039,"SIM",2.71],["Ferragens","FR-11 CZ","FERRAGEM DOBRADICA MOD 11 COR CINZA",285,84,68,80,162,371,642,"SIM",1.83],["Ferragens","FR-11 INOX","FERRAGEM DOBRADICA MOD 11 COR INOX ESCOVADO",486,60,80,60,0,0,0,"SIM",0],["Ferragens","FR-20 BR","FERRAGEM DOBRADICA MOD 20 COR BRANCO",341,76,3,31,558,1095,2179,"SIM",5.95],["Ferragens","FR-20 PT","FERRAGEM DOBRADICA MOD 20 COR PRETO",127,135,52,27,"SV","SV","SV","SIM",0],["Ferragens","FR-20 CZ","FERRAGEM DOBRADICA MOD 20 COR CINZA",726,149,18,43,383,736,1479,"SIM",4.18],["Ferragens","FR-20 INOX","FERRAGEM DOBRADICA MOD 20 COR INOX ESCOVADO",148,119,36,105,"SV","SV","SV","SIM",0],["Ferragens","FR-21 BR","FERRAGEM DOBRADICA MOD 21 COR BRANCO",606,77,25,64,583,1271,2377,"SIM",6.66],["Ferragens","FR-21 INOX","FERRAGEM DOBRADICA MOD 21 COR INOX ESCOVADO",40,101,35,68,0,0,132,"NAO",0],["Ferragens","FR-30 BR","FERRAGEM DOBRADICA MOD 30 COR BRANCO",801,58,77,26,0,0,70,"SIM",0],["Ferragens","FR-30 CZ","FERRAGEM DOBRADICA MOD 30 COR CINZA",53,24,80,44,0,0,0,"SIM",0],["Ferragens","FR-30 INOX","FERRAGEM DOBRADICA MOD 30 COR INOX ESCOVADO",263,51,16,94,661,1311,2503,"SIM",7.02],["Ferragens","FR-31 CZ","FERRAGEM DOBRADICA MOD 31 COR CINZA",721,123,37,84,"SV","SV","SV","SIM",0],["Ferragens","FR-31 INOX","FERRAGEM DOBRADICA MOD 31 COR INOX ESCOVADO",58,57,50,63,"SV","SV","SV","NAO",0],["Ferragens","FR-40 CZ","FERRAGEM DOBRADICA MOD 40 COR CINZA",29,149,48,70,705,1386,2749,"NAO",7.82],["Ferragens","FR-41 PT","FERRAGEM DOBRADICA MOD 41 COR PRETO",407,77,52,91,362,742,1503,"SIM",4.28],["Ferragens","FR-41 CZ","FERRAGEM DOBRADICA MOD 41 COR CINZA",106,34,49,25,562,1187,2331,"SIM",6.31],["Ferragens","FR-41 INOX","FERRAGEM DOBRADICA MOD 41 COR INOX ESCOVADO",123,125,78,89,0,0,0,"SIM",0],["Ferragens","FR-50 BR","FERRAGEM DOBRADICA MOD 50 COR BRANCO",481,25,47,55,615,1280,2417,"SIM",6.8],["Ferragens","FR-50 PT","FERRAGEM DOBRADICA MOD 50 COR PRETO",726,31,58,70,"SV","SV","SV","SIM",0],["Ferragens","FR-50 CZ","FERRAGEM DOBRADICA MOD 50 COR CINZA",517,85,31,22,"SV","SV","SV","SIM",0],["Ferragens","FR-51 PT","FERRAGEM DOBRADICA MOD 51 COR PRETO",613,59,42,95,"SV","SV","SV","SIM",0],["Ferragens","FR-60 BR","FERRAGEM DOBRADICA MOD 60 COR BRANCO",228,91,30,36,1210,2401,4848,"SIM",13.42],["Ferragens","FR-60 PT","FERRAGEM DOBRADICA MOD 60 COR PRETO",261,121,57,22,368,676,1437,"SIM",4.03],["Ferragens","FR-60 INOX","FERRAGEM DOBRADICA MOD 60 COR INOX ESCOVADO",720,133,38,98,"SV","SV","SV","SIM",0],["Ferragens","FR-61 BR","FERRAGEM DOBRADICA MOD 61 COR BRANCO",520,20,41,81,281,586,1146,"SIM",3.22],["Ferragens","FR-61 PT","FERRAGEM DOBRADICA MOD 61 COR PRETO",31,135,37,28,644,1242,2450,"SIM",6.94],["Ferragens","FR-61 CZ","FERRAGEM DOBRADICA MOD 61 COR CINZA",273,141,27,109,"SV","SV","SV","SIM",0],["Ferragens","FR-61 INOX","FERRAGEM DOBRADICA MOD 61 COR INOX ESCOVADO",675,39,60,78,102,183,402,"SIM",1.16],["Ferragens","FR-70 BR","FERRAGEM DOBRADICA MOD 70 COR BRANCO",648,150,71,30,437,880,1672,"SIM",4.81],["Ferragens","FR-70 PT","FERRAGEM DOBRADICA MOD 70 COR PRETO",226,79,45,105,0,94,165,"SIM",0.35],["Ferragens","FR-70 CZ","FERRAGEM DOBRADICA MOD 70 COR CINZA",491,27,44,84,"SV","SV","SV","SIM",0],["Ferragens","FR-71 BR","FERRAGEM DOBRADICA MOD 71 COR BRANCO",897,142,3,117,288,501,1066,"SIM",3.05],["Ferragens","FR-71 PT","FERRAGEM DOBRADICA MOD 71 COR PRETO",105,79,43,23,"SV","SV","SV","SIM",0],["Ferragens","FR-71 CZ","FERRAGEM DOBRADICA MOD 71 COR CINZA",481,55,48,104,492,981,1978,"SIM",5.27],["Ferragens","FR-71 INOX","FERRAGEM DOBRADICA MOD 71 COR INOX ESCOVADO",510,13,19,63,478,966,1833,"SIM",5.16],["Ferragens","FR-80 BR","FERRAGEM DOBRADICA MOD 80 COR BRANCO",13,131,14,54,0,18,18,"NAO",0],["Ferragens","FR-80 PT","FERRAGEM DOBRADICA MOD 80 COR PRETO",525,101,76,34,246,429,854,"SIM",2.41],["Ferragens","FR-80 CZ","FERRAGEM DOBRADICA MOD 80 COR CINZA",638,65,37,118,"SV","SV","SV","SIM",0],["Ferragens","FR-80 INOX","FERRAGEM DOBRADICA MOD 80 COR INOX ESCOVADO",979,136,29,42,"SV","SV","SV","SIM",0],["Ferragens","FR-81 BR","FERRAGEM DOBRADICA MOD 81 COR BRANCO",717,80,73,29,0,0,0,"SIM",0],["Ferragens","FR-81 PT","FERRAGEM DOBRADICA MOD 81 COR PRETO",435,5,41,71,"SV","SV","SV","SIM",0],["Ferragens","FR-81 CZ","FERRAGEM DOBRADICA MOD 81 COR CINZA",47,111,75,99,7,7,9,"NAO",0],["Ferragens","FR-81 INOX","FERRAGEM DOBRADICA MOD 81 COR INOX ESCOVADO",1023,130,24,115,611,1250,2445,"SIM",6.86],["Ferragens","FR-90 PT","FERRAGEM DOBRADICA MOD 90 COR PRETO",388,26,18,113,"SV","SV","SV","SIM",0],["Ferragens","FR-90 CZ","FERRAGEM DOBRADICA MOD 90 COR CINZA",269,126,59,42,0,22,77,"SIM",0],["Ferragens","FR-91 PT","FERRAGEM DOBRADICA MOD 91 COR PRETO",800,120,56,101,105,328,493,"SIM",1.43],["Ferragens","FR-91 CZ","FERRAGEM DOBRADICA MOD 91 COR CINZA",744,118,57,55,"SV","SV","SV","SIM",0],["Ferragens","FR-91 INOX","FERRAGEM DOBRADICA MOD 91 COR INOX ESCOVADO",222,129,49,67,370,779,1453,"SIM",4.19],["Ferragens","FR-100 BR","FERRAGEM DOBRADICA MOD 100 COR BRANCO",0,38,7,25,138,215,486,"NAO",1.42],["Ferragens","FR-100 PT","FERRAGEM DOBRADICA MOD 100 COR PRETO",758,112,67,63,445,938,1804,"SIM",4.96],["Ferragens","FR-100 CZ","FERRAGEM DOBRADICA MOD 100 COR CINZA",583,85,8,56,575,1096,2349,"SIM",6.34],["Ferragens","FR-100 INOX","FERRAGEM DOBRADICA MOD 100 COR INOX ESCOVADO",559,38,42,91,188,370,723,"SIM",2.26],["Ferragens","FR-101 BR","FERRAGEM DOBRADICA MOD 101 COR BRANCO",0,79,71,59,0,0,0,"NAO",0],["Ferragens","FR-101 PT","FERRAGEM DOBRADICA MOD 101 COR PRETO",0,134,11,62,469,990,1911,"NAO",5.52],["Ferragens","FR-101 CZ","FERRAGEM DOBRADICA MOD 101 COR CINZA",105,35,19,66,471,898,1817,"SIM",5.04],["Ferragens","FR-101 INOX","FERRAGEM DOBRADICA MOD 101 COR INOX ESCOVADO",172,86,79,120,770,1507,2993,"SIM",8.34]]};
+
+/* =================================================================
+   2. REGRAS DE NEGÓCIO
+   ================================================================= */
+function groupConfigForSheet(sheetName){
+  const norm = (sheetName||'').trim().toUpperCase();
+  return CLIENT_CONFIG.groups.find(g=> g.sheetNames.some(s=>s.toUpperCase()===norm)) || null;
+}
+function groupConfigForKey(key){
+  return CLIENT_CONFIG.groups.find(g=>g.key===key) || null;
+}
+function coverDaysFor(groupKey){
+  const g = groupConfigForKey(groupKey);
+  return g ? g.coverageDays : 0;
+}
+
+function buildRecord(r, groupCfg){
+  const [ , codigo, descricao, disponivel, comprado, previsto, minimo, v90, v180, v360, excessoOrig, vmd] = r;
+  const semV90 = (v90 === 'SV');
+  const semV180 = (v180 === 'SV');
+  const semV360 = (v360 === 'SV');
+  const semVenda = semV90 && semV180 && semV360;
+  const dias = groupCfg.coverageDays;
+  const vendaEquiv = vmd * dias;
+  const limiar = Math.max(minimo, vendaEquiv);
+  const isExcesso = (disponivel > minimo) && (disponivel > vendaEquiv);
+  const excessoQtd = Math.max(0, disponivel - limiar);
+  const cobertura = vmd > 0 ? (disponivel / vmd) : null; // null => "Sem venda"
+
+  let classe;
+  if(semVenda && disponivel > 0){
+    classe = 'CRIT';
+  } else if(isExcesso){
+    classe = 'EXCESSO';
+  } else if(disponivel > minimo){
+    classe = 'ATENCAO';
+  } else {
+    classe = 'NORMAL';
+  }
+
+  return {
+    grupo:groupCfg.key, codigo, descricao,
+    disponivel, comprado, previsto, minimo,
+    v90, v180, v360, semV90, semV180, semV360, semVenda,
+    vmd, dias, vendaEquiv, excessoQtd, isExcesso, cobertura, classe, excessoOrig
+  };
+}
+
+let DATASET = {};
+let ALL_RECORDS = [];
+
+function loadDataset(rawObj){
+  DATASET = rawObj;
+  ALL_RECORDS = [];
+  Object.keys(rawObj).forEach(sheetName=>{
+    const groupCfg = groupConfigForSheet(sheetName);
+    if(!groupCfg) return; // aba não mapeada em CLIENT_CONFIG.groups — ignorada
+    rawObj[sheetName].forEach(row=>{
+      ALL_RECORDS.push(buildRecord(row, groupCfg));
+    });
+  });
+}
+loadDataset(RAW_DATA);
+
+/* =================================================================
+   3. HELPERS DE FORMATAÇÃO
+   ================================================================= */
+const fmtInt = n => Math.round(n).toLocaleString('pt-BR');
+const fmtNum = (n,d=1) => n.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtPct = n => n.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+function coberturaLabel(rec){
+  if(rec.cobertura === null) return 'Sem venda';
+  return fmtInt(rec.cobertura)+' dias';
+}
+function vendaCellLabel(v){ return v === 'SV' ? 'Sem venda' : fmtInt(v); }
+const CLASS_LABEL = {CRIT:'Crítico / Sem venda', EXCESSO:'Excesso', ATENCAO:'Atenção', NORMAL:'Normal'};
+const GROUP_LABEL = key => (groupConfigForKey(key)||{}).label || key;
+
+/* =================================================================
+   3b. APLICA CLIENT_CONFIG NA INTERFACE (marca, textos, hero, rótulos)
+   ================================================================= */
+function applyClientConfigToUI(){
+  document.title = CLIENT_CONFIG.pageTitle;
+  document.documentElement.style.setProperty('--steel', CLIENT_CONFIG.brand.steel);
+  document.documentElement.style.setProperty('--steel-dark', CLIENT_CONFIG.brand.steelDark);
+  document.documentElement.style.setProperty('--steel-light', CLIENT_CONFIG.brand.steelLight);
+
+  const set = (id, val) => { const el=document.getElementById(id); if(el) el.textContent = val; };
+  const setHtml = (id, val) => { const el=document.getElementById(id); if(el) el.innerHTML = val; };
+
+  set('topbarTitle', CLIENT_CONFIG.topbarTitle);
+  set('topbarSubtitle', CLIENT_CONFIG.topbarSubtitle);
+
+  set('heroEyebrow', CLIENT_CONFIG.hero.eyebrow);
+  setHtml('heroTitle', CLIENT_CONFIG.hero.titleHtml);
+  set('heroText', CLIENT_CONFIG.hero.text);
+  const pillsEl = document.getElementById('heroPills');
+  if(pillsEl) pillsEl.innerHTML = CLIENT_CONFIG.hero.pills.map(p=>`<span class="hero-pill">${p}</span>`).join('');
+
+  const videoSource = document.querySelector('#bgVideo source');
+  const bgVideoEl = document.getElementById('bgVideo');
+  if(CLIENT_CONFIG.hero.videoSrc){
+    if(videoSource){ videoSource.setAttribute('src', CLIENT_CONFIG.hero.videoSrc); }
+    if(bgVideoEl) bgVideoEl.load();
+  } else if(bgVideoEl){
+    // Cliente ainda sem vídeo institucional cadastrado: some o vídeo e mantém
+    // o fundo sólido na cor de marca por trás do véu/gradiente do hero.
+    bgVideoEl.style.display = 'none';
+  }
+
+  // Rótulos dos dois grupos, aplicados a todos os controles que dependem deles
+  document.querySelectorAll('.js-group-a-label').forEach(el=>el.textContent = GROUP_A.label+(el.dataset.plural?'s':''));
+  document.querySelectorAll('.js-group-b-label').forEach(el=>el.textContent = GROUP_B.label+(el.dataset.plural?'s':''));
+  document.querySelectorAll('.js-group-a-key').forEach(el=>el.setAttribute('data-grp', GROUP_A.key));
+  document.querySelectorAll('.js-group-b-key').forEach(el=>el.setAttribute('data-grp', GROUP_B.key));
+  const optA = document.getElementById('fGrupoOptA'); if(optA){ optA.value=GROUP_A.key; optA.textContent=GROUP_A.label; }
+  const optB = document.getElementById('fGrupoOptB'); if(optB){ optB.value=GROUP_B.key; optB.textContent=GROUP_B.label; }
+
+  // Textos da aba "Atualizar Dados", derivados das abas/colunas configuradas
+  const sheetTags = CLIENT_CONFIG.groups.map(g=>`<code>${g.sheetNames[0]}</code>`).join(' e ');
+  setHtml('uploadIntroText', `Envie um arquivo .xlsx ou .csv com as abas ${sheetTags}, seguindo a mesma estrutura de colunas da base atual. Os dados originais desta sessão não são alterados até a confirmação do carregamento.`);
+  const cm = CLIENT_CONFIG.columnMap;
+  const colOrder = [cm.grupo, cm.codigo, cm.descricao, cm.disponivel, cm.comprado, cm.previsto, cm.minimo, cm.venda90, cm.venda180, cm.venda360, cm.excessoOriginal, cm.vmd];
+  setHtml('uploadColumnsList', colOrder.map(c=>`<code>${c}</code>`).join(' · '));
+}
+
+/* =================================================================
+   4. TABS
+   ================================================================= */
+function switchTab(tabName){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  const btn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+  if(btn) btn.classList.add('active');
+  const view = document.getElementById('view-'+tabName);
+  if(view) view.classList.add('active');
+  document.body.classList.toggle('video-full', tabName==='home');
+  window.scrollTo({top:0, behavior:'instant' in window ? 'instant' : 'auto'});
+}
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=> switchTab(btn.dataset.tab));
+});
+document.querySelectorAll('[data-goto]').forEach(el=>{
+  el.addEventListener('click', ()=> switchTab(el.dataset.goto));
+});
+
+/* =================================================================
+   5. KPIs
+   ================================================================= */
+function computeKPIs(records){
+  const total = records.length;
+  const excesso = records.filter(r=>r.classe==='EXCESSO');
+  const semVenda = records.filter(r=>r.classe==='CRIT');
+  const excessoOuSemVenda = records.filter(r=>r.classe==='EXCESSO'||r.classe==='CRIT');
+  const qtdEstoqueExcesso = excesso.reduce((s,r)=>s+r.disponivel,0);
+  return {
+    total,
+    excessoCount: excesso.length,
+    semVendaCount: semVenda.length,
+    excessoOuSemVendaCount: excessoOuSemVenda.length,
+    qtdEstoqueExcesso,
+    pctExcesso: total? excesso.length/total*100 : 0,
+    pctSemVenda: total? semVenda.length/total*100 : 0
+  };
+}
+
+function renderKPIGrid(elId, k, opts){
+  opts = opts||{};
+  const el = document.getElementById(elId);
+  const cards = [
+    {label:'Total de SKUs', value:fmtInt(k.total), tone:'steel'},
+    {label:'Produtos em excesso', value:fmtInt(k.excessoCount), sub:fmtPct(k.pctExcesso)+' da base', tone:'excesso'},
+    {label:'Produtos sem venda', value:fmtInt(k.semVendaCount), sub:fmtPct(k.pctSemVenda)+' da base', tone:'crit'},
+    {label:'Excesso + sem venda', value:fmtInt(k.excessoOuSemVendaCount), tone:'crit'},
+    {label:'Qtd. em estoque (excesso)', value:fmtInt(k.qtdEstoqueExcesso)+' un', tone:'excesso'},
+    {label:'% SKUs em excesso', value:fmtPct(k.pctExcesso), tone:'excesso'},
+    {label:'% SKUs sem venda', value:fmtPct(k.pctSemVenda), tone:'crit'},
+    {label:'Valor financeiro (excesso)', value:'N/D', sub:'coluna de preço não disponível na base', tone:'normal'}
+  ];
+  el.innerHTML = cards.map(c=>`
+    <div class="kpi tone-${c.tone}">
+      <div class="label">${c.label}</div>
+      <div class="value">${c.value}</div>
+      ${c.sub?`<div class="sub">${c.sub}</div>`:''}
+    </div>`).join('');
+}
+
+/* =================================================================
+   6. CHARTS
+   ================================================================= */
+let chartClass=null, chartCompare=null;
+function renderCharts(records){
+  if(typeof Chart === 'undefined'){
+    ['chartClass','chartCompare'].forEach(id=>{
+      const c = document.getElementById(id);
+      if(c && c.parentElement) c.parentElement.innerHTML = '<div class="empty-note">Biblioteca de gráficos não carregou (verifique a conexão). Os demais dados do painel continuam funcionando normalmente.</div>';
+    });
+    return;
+  }
+  const byClass = {CRIT:0,EXCESSO:0,ATENCAO:0,NORMAL:0};
+  records.forEach(r=>byClass[r.classe]++);
+
+  const ctx1 = document.getElementById('chartClass').getContext('2d');
+  if(chartClass) chartClass.destroy();
+  chartClass = new Chart(ctx1,{
+    type:'bar',
+    data:{
+      labels:['Excesso','Sem venda','Atenção','Normal'],
+      datasets:[{
+        data:[byClass.EXCESSO, byClass.CRIT, byClass.ATENCAO, byClass.NORMAL],
+        backgroundColor:['#C9760A','#C0392B','#A88A05','#1E7A46'],
+        borderRadius:5, maxBarThickness:56
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{beginAtZero:true, grid:{color:'#EEF1F4'}, ticks:{font:{family:'IBM Plex Mono',size:11}}},
+        x:{grid:{display:false}, ticks:{font:{family:'IBM Plex Sans',size:12,weight:600}}}
+      }
+    }
+  });
+
+  const perfilRecs = records.filter(r=>r.grupo===GROUP_A.key);
+  const ferragemRecs = records.filter(r=>r.grupo===GROUP_B.key);
+  const pK = computeKPIs(perfilRecs), fK = computeKPIs(ferragemRecs);
+
+  const ctx2 = document.getElementById('chartCompare').getContext('2d');
+  if(chartCompare) chartCompare.destroy();
+  chartCompare = new Chart(ctx2,{
+    type:'bar',
+    data:{
+      labels:['Excesso','Sem venda'],
+      datasets:[
+        {label:'Perfis', data:[pK.excessoCount,pK.semVendaCount], backgroundColor:'#2F6690', borderRadius:5, maxBarThickness:40},
+        {label:'Ferragens', data:[fK.excessoCount,fK.semVendaCount], backgroundColor:'#8FB6CF', borderRadius:5, maxBarThickness:40}
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom', labels:{font:{family:'IBM Plex Sans',size:11.5}, boxWidth:10}}},
+      scales:{
+        y:{beginAtZero:true, grid:{color:'#EEF1F4'}, ticks:{font:{family:'IBM Plex Mono',size:11}}},
+        x:{grid:{display:false}, ticks:{font:{family:'IBM Plex Sans',size:12,weight:600}}}
+      }
+    }
+  });
+}
+
+/* =================================================================
+   7. RANKINGS (visão geral)
+   ================================================================= */
+function renderRankings(records){
+  const topExcesso = [...records].filter(r=>r.classe==='EXCESSO').sort((a,b)=>b.excessoQtd-a.excessoQtd).slice(0,10);
+  const topSemVenda = [...records].filter(r=>r.classe==='CRIT').sort((a,b)=>b.disponivel-a.disponivel).slice(0,10);
+
+  const maxExc = topExcesso[0]?topExcesso[0].excessoQtd:1;
+  document.getElementById('rankExcesso').innerHTML = topExcesso.map((r,i)=>`
+    <li>
+      <span class="n">${i+1}</span>
+      <span>
+        <span class="code">${r.codigo}</span>
+        <span class="desc">${r.descricao||'—'} · ${GROUP_LABEL(r.grupo)}</span>
+        <div class="bar-mini"><i style="width:${Math.max(4,r.excessoQtd/maxExc*100)}%"></i></div>
+      </span>
+      <span class="val">${fmtInt(r.excessoQtd)} un</span>
+    </li>`).join('') || '<li class="empty-note">Nenhum produto em excesso.</li>';
+
+  const maxSV = topSemVenda[0]?topSemVenda[0].disponivel:1;
+  document.getElementById('rankSemVenda').innerHTML = topSemVenda.map((r,i)=>`
+    <li>
+      <span class="n">${i+1}</span>
+      <span>
+        <span class="code">${r.codigo}</span>
+        <span class="desc">${r.descricao||'—'} · ${GROUP_LABEL(r.grupo)}</span>
+        <div class="bar-mini"><i style="width:${Math.max(4,r.disponivel/maxSV*100)}%;background:var(--crit)"></i></div>
+      </span>
+      <span class="val">${fmtInt(r.disponivel)} un</span>
+    </li>`).join('') || '<li class="empty-note">Nenhum produto sem venda com estoque.</li>';
+}
+
+/* =================================================================
+   8. PRIORIDADES DE AÇÃO
+   ================================================================= */
+function priorityScore(r){
+  // Tier 1: sem venda com estoque > 0  (maior estoque primeiro)
+  if(r.classe==='CRIT') return [0, -r.disponivel];
+  // Tier 2: maior excesso de estoque
+  if(r.classe==='EXCESSO') return [1, -r.excessoQtd];
+  // Tier 3: maior cobertura em dias (produtos com estoque acima do mínimo, sem ser excesso)
+  if(r.classe==='ATENCAO') return [2, -(r.cobertura===null?0:r.cobertura)];
+  // Tier 4: maior quantidade absoluta em estoque
+  return [3, -r.disponivel];
+}
+
+function renderPriority(grpFilter){
+  let recs = ALL_RECORDS.filter(r=> r.classe==='CRIT' || r.classe==='EXCESSO' || r.classe==='ATENCAO');
+  if(grpFilter!=='TODOS'){
+    recs = recs.filter(r=> grpFilter===GROUP_A.key ? r.grupo===GROUP_A.key : r.grupo===GROUP_B.key);
+  }
+  recs.sort((a,b)=>{
+    const sa=priorityScore(a), sb=priorityScore(b);
+    if(sa[0]!==sb[0]) return sa[0]-sb[0];
+    if(sa[1]!==sb[1]) return sa[1]-sb[1];
+    return b.disponivel - a.disponivel;
+  });
+  recs = recs.slice(0,60);
+
+  const el = document.getElementById('priorityList');
+  if(!recs.length){ el.innerHTML='<div class="empty-note">Nenhum produto prioritário encontrado.</div>'; return; }
+
+  el.innerHTML = recs.map((r,i)=>{
+    let metric1label='Estoque', metric1val=fmtInt(r.disponivel)+' un';
+    let metric2label='Cobertura', metric2val=coberturaLabel(r);
+    let metric3label='Excesso', metric3val=fmtInt(r.excessoQtd)+' un';
+    return `
+    <div class="priority-card row-${r.classe}">
+      <div class="rank-num">${i+1}</div>
+      <div class="info">
+        <div class="code">${r.codigo} <span class="badge ${r.classe}">${CLASS_LABEL[r.classe]}</span></div>
+        <div class="desc">${r.descricao||'—'} · ${GROUP_LABEL(r.grupo)}</div>
+      </div>
+      <div class="metrics">
+        <div><span class="mlabel">${metric1label}</span><span class="mval">${metric1val}</span></div>
+        <div><span class="mlabel">${metric2label}</span><span class="mval">${metric2val}</span></div>
+        <div><span class="mlabel">${metric3label}</span><span class="mval">${metric3val}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+document.querySelectorAll('#priorityGroupToggle .pill').forEach(p=>{
+  p.addEventListener('click',()=>{
+    document.querySelectorAll('#priorityGroupToggle .pill').forEach(x=>x.classList.remove('active'));
+    p.classList.add('active');
+    renderPriority(p.dataset.grp);
+  });
+});
+
+/* =================================================================
+   8b. MODELOS — agrupamento ignorando a cor
+   A cor é reconhecida tanto pelos códigos abreviados que aparecem no
+   próprio Código (PT, BC, NT, FS, BZ, CR, NF, NB, VD, MR, CZ, AZ...)
+   quanto pelos nomes de cor por extenso, com base no padrão observado
+   nas Descrições dos itens (Preto, Branco, Natural, Fosco, Bronze,
+   Cromado/Brilhante, Cerejeira Real, Nogueira Escuro etc.).
+   ================================================================= */
+const COLOR_SINGLE_TOKENS = new Set(CLIENT_CONFIG.colorTokens.map(t=>t.toUpperCase()));
+const COLOR_PHRASES = CLIENT_CONFIG.colorPhrases;
+const COLOR_GLUED_RE = new RegExp('^(.*[A-Za-z])('+CLIENT_CONFIG.colorGluedSuffixes.join('|')+')$');
+
+function extractModelo(codigo){
+  let s = (codigo||'').trim().replace(/\s+/g,' ');
+  if(!s) return codigo;
+  let joined = ' '+s+' ';
+  COLOR_PHRASES.forEach(ph=>{
+    const phrase = ' '+ph.join(' ')+' ';
+    joined = joined.split(phrase).join(' ');
+  });
+  let tokens = joined.trim().split(' ').filter(Boolean);
+  tokens = tokens.filter(t=>{
+    const u = t.toUpperCase();
+    return !COLOR_SINGLE_TOKENS.has(u);
+  });
+  let result = tokens.join(' ').trim();
+  const m = result.match(COLOR_GLUED_RE);
+  if(m && m[1].length>=3) result = m[1];
+  return result || codigo;
+}
+
+const CLASS_PRIORITY = {CRIT:0, EXCESSO:1, ATENCAO:2, NORMAL:3};
+
+
+function buildModelGroups(records){
+  const map = new Map();
+  records.forEach(r=>{
+    const modelo = extractModelo(r.codigo);
+    const key = r.grupo + '|' + modelo.toUpperCase();
+    if(!map.has(key)){
+      map.set(key, {
+        modelo, grupo:r.grupo, skus:[], totalDisponivel:0, totalExcessoQtd:0,
+        counts:{CRIT:0,EXCESSO:0,ATENCAO:0,NORMAL:0}
+      });
+    }
+    const g = map.get(key);
+    g.skus.push(r);
+    g.totalDisponivel += r.disponivel;
+    g.totalExcessoQtd += r.excessoQtd;
+    g.counts[r.classe]++;
+  });
+  const groups = Array.from(map.values());
+  groups.forEach(g=>{
+    g.coresCount = g.skus.length;
+    let best = 'NORMAL';
+    Object.keys(g.counts).forEach(c=>{
+      if(g.counts[c]>0 && CLASS_PRIORITY[c] < CLASS_PRIORITY[best]) best = c;
+    });
+    g.topClasse = best;
+  });
+  return groups;
+}
+
+let ALL_MODEL_GROUPS = [];
+let filteredModelGroups = [];
+let modelCurrentPage = 1;
+const MODEL_PAGE_SIZE = 48;
+
+function computeModelKPIs(groups){
+  const total = groups.length;
+  const byClass = {CRIT:0,EXCESSO:0,ATENCAO:0,NORMAL:0};
+  groups.forEach(g=>byClass[g.topClasse]++);
+  return {
+    total,
+    crit: byClass.CRIT, excesso: byClass.EXCESSO, atencao: byClass.ATENCAO, normal: byClass.NORMAL,
+    pctExcesso: total? byClass.EXCESSO/total*100 : 0,
+    pctSemVenda: total? byClass.CRIT/total*100 : 0
+  };
+}
+
+function renderModelKPIs(groups){
+  const k = computeModelKPIs(groups);
+  const el = document.getElementById('kpiModelsGrid');
+  const cards = [
+    {label:'Total de modelos', value:fmtInt(k.total), tone:'steel'},
+    {label:'Modelos em excesso', value:fmtInt(k.excesso), sub:fmtPct(k.pctExcesso)+' dos modelos', tone:'excesso'},
+    {label:'Modelos sem venda', value:fmtInt(k.crit), sub:fmtPct(k.pctSemVenda)+' dos modelos', tone:'crit'},
+    {label:'Modelos em atenção', value:fmtInt(k.atencao), tone:'atencao'},
+    {label:'Modelos normais', value:fmtInt(k.normal), tone:'normal'}
+  ];
+  el.innerHTML = cards.map(c=>`
+    <div class="kpi tone-${c.tone}">
+      <div class="label">${c.label}</div>
+      <div class="value">${c.value}</div>
+      ${c.sub?`<div class="sub">${c.sub}</div>`:''}
+    </div>`).join('');
+}
+
+function applyModelFilters(){
+  const grp = document.querySelector('#modelGroupToggle .pill.active')?.dataset.grp || 'TODOS';
+  const search = document.getElementById('mSearch').value.trim().toLowerCase();
+  const classe = document.getElementById('mClass').value;
+  const sort = document.getElementById('mSort').value;
+
+  let groups = ALL_MODEL_GROUPS;
+  if(grp!=='TODOS'){
+    groups = groups.filter(g=> grp===GROUP_A.key ? g.grupo===GROUP_A.key : g.grupo===GROUP_B.key);
+  }
+  renderModelKPIs(groups);
+
+  let list = groups.filter(g=>{
+    if(search && !g.modelo.toLowerCase().includes(search)) return false;
+    if(classe!=='TODOS' && g.topClasse!==classe) return false;
+    return true;
+  });
+
+  list = list.slice().sort((a,b)=>{
+    switch(sort){
+      case 'excesso': return b.totalExcessoQtd - a.totalExcessoQtd;
+      case 'cores': return b.coresCount - a.coresCount;
+      case 'modelo': return a.modelo.localeCompare(b.modelo);
+      default: return b.totalDisponivel - a.totalDisponivel;
+    }
+  });
+
+  filteredModelGroups = list;
+  modelCurrentPage = 1;
+  renderModelGrid();
+}
+
+function renderModelGrid(){
+  const total = filteredModelGroups.length;
+  const totalPages = Math.max(1, Math.ceil(total/MODEL_PAGE_SIZE));
+  modelCurrentPage = Math.min(modelCurrentPage, totalPages);
+  const start = (modelCurrentPage-1)*MODEL_PAGE_SIZE;
+  const pageGroups = filteredModelGroups.slice(start, start+MODEL_PAGE_SIZE);
+
+  document.getElementById('modelResultCount').innerHTML = `<b>${fmtInt(total)}</b> modelos encontrados`;
+  document.getElementById('modelGrid').innerHTML = pageGroups.map(g=>{
+    const chips = ['CRIT','EXCESSO','ATENCAO','NORMAL']
+      .filter(c=>g.counts[c]>0)
+      .map(c=>`<span class="mchip ${c}">${g.counts[c]} ${CLASS_LABEL[c]}</span>`).join('');
+    return `
+    <div class="model-card top-${g.topClasse}">
+      <div class="mhead">
+        <div>
+          <div class="mcode">${g.modelo}</div>
+          <div class="mgrp">${GROUP_LABEL(g.grupo)}</div>
+        </div>
+        <span class="badge ${g.topClasse}">${CLASS_LABEL[g.topClasse]}</span>
+      </div>
+      <div class="mstats">
+        <div class="mstat"><div class="mlabel">Cores/variações</div><div class="mval">${g.coresCount}</div></div>
+        <div class="mstat"><div class="mlabel">Estoque total</div><div class="mval">${fmtInt(g.totalDisponivel)}</div></div>
+        <div class="mstat"><div class="mlabel">Excesso total</div><div class="mval">${fmtInt(g.totalExcessoQtd)}</div></div>
+        <div class="mstat"><div class="mlabel">Sem venda</div><div class="mval">${g.counts.CRIT}</div></div>
+      </div>
+      <div class="mbreakdown">${chips}</div>
+    </div>`;
+  }).join('') || '<div class="empty-note">Nenhum modelo encontrado com os filtros selecionados.</div>';
+
+  document.getElementById('mPagerInfo').textContent = `Página ${modelCurrentPage} de ${totalPages}`;
+  document.getElementById('mpgFirst').disabled = modelCurrentPage<=1;
+  document.getElementById('mpgPrev').disabled = modelCurrentPage<=1;
+  document.getElementById('mpgNext').disabled = modelCurrentPage>=totalPages;
+  document.getElementById('mpgLast').disabled = modelCurrentPage>=totalPages;
+}
+
+document.querySelectorAll('#modelGroupToggle .pill').forEach(p=>{
+  p.addEventListener('click',()=>{
+    document.querySelectorAll('#modelGroupToggle .pill').forEach(x=>x.classList.remove('active'));
+    p.classList.add('active');
+    applyModelFilters();
+  });
+});
+document.getElementById('mApply').addEventListener('click', applyModelFilters);
+document.getElementById('mSearch').addEventListener('keydown', e=>{ if(e.key==='Enter') applyModelFilters(); });
+document.getElementById('mReset').addEventListener('click', ()=>{
+  document.getElementById('mSearch').value='';
+  document.getElementById('mClass').value='TODOS';
+  document.getElementById('mSort').value='estoque';
+  document.querySelectorAll('#modelGroupToggle .pill').forEach(x=>x.classList.remove('active'));
+  document.querySelector('#modelGroupToggle .pill[data-grp="TODOS"]').classList.add('active');
+  applyModelFilters();
+});
+document.getElementById('mpgFirst').addEventListener('click',()=>{modelCurrentPage=1;renderModelGrid();});
+document.getElementById('mpgPrev').addEventListener('click',()=>{modelCurrentPage--;renderModelGrid();});
+document.getElementById('mpgNext').addEventListener('click',()=>{modelCurrentPage++;renderModelGrid();});
+document.getElementById('mpgLast').addEventListener('click',()=>{modelCurrentPage=Math.ceil(filteredModelGroups.length/MODEL_PAGE_SIZE);renderModelGrid();});
+
+/* =================================================================
+   9. TABELA DETALHADA (filtros + paginação)
+   ================================================================= */
+const PAGE_SIZE = 60;
+let currentPage = 1;
+let filteredRecords = [];
+
+function applyFilters(){
+  const grupo = document.getElementById('fGrupo').value;
+  const classe = document.getElementById('fClass').value;
+  const codigo = document.getElementById('fCodigo').value.trim().toLowerCase();
+  const desc = document.getElementById('fDesc').value.trim().toLowerCase();
+  const estMin = parseFloat(document.getElementById('fEstMin').value);
+  const estMax = parseFloat(document.getElementById('fEstMax').value);
+  const venda = document.getElementById('fVenda').value;
+  const excesso = document.getElementById('fExcesso').value;
+  const sort = document.getElementById('fSort').value;
+
+  let recs = ALL_RECORDS.filter(r=>{
+    if(grupo!=='TODOS'){
+      if(grupo===GROUP_A.key && r.grupo!==GROUP_A.key) return false;
+      if(grupo===GROUP_B.key && r.grupo!==GROUP_B.key) return false;
+    }
+    if(classe!=='TODOS' && r.classe!==classe) return false;
+    if(codigo && !r.codigo.toLowerCase().includes(codigo)) return false;
+    if(desc && !(r.descricao||'').toLowerCase().includes(desc)) return false;
+    if(!isNaN(estMin) && r.disponivel < estMin) return false;
+    if(!isNaN(estMax) && r.disponivel > estMax) return false;
+    if(venda==='COM' && r.semV90) return false;
+    if(venda==='SEM' && !r.semVenda) return false;
+    if(excesso==='SIM' && !r.isExcesso) return false;
+    return true;
+  });
+
+  recs = recs.slice().sort((a,b)=>{
+    switch(sort){
+      case 'excesso': return b.excessoQtd - a.excessoQtd;
+      case 'cobertura': {
+        const av = a.cobertura===null?-1:a.cobertura, bv = b.cobertura===null?-1:b.cobertura;
+        return bv-av;
+      }
+      case 'venda': {
+        const av = a.semV90?-1:a.v90, bv = b.semV90?-1:b.v90;
+        return av-bv;
+      }
+      case 'codigo': return a.codigo.localeCompare(b.codigo);
+      default: return b.disponivel - a.disponivel;
+    }
+  });
+
+  filteredRecords = recs;
+  currentPage = 1;
+  renderTable();
+}
+
+function coverBarColor(rec){
+  if(rec.classe==='CRIT') return '#C0392B';
+  if(rec.classe==='EXCESSO') return '#C9760A';
+  if(rec.classe==='ATENCAO') return '#A88A05';
+  return '#1E7A46';
+}
+
+function renderTable(){
+  const total = filteredRecords.length;
+  const totalPages = Math.max(1, Math.ceil(total/PAGE_SIZE));
+  currentPage = Math.min(currentPage, totalPages);
+  const start = (currentPage-1)*PAGE_SIZE;
+  const pageRecs = filteredRecords.slice(start, start+PAGE_SIZE);
+
+  document.getElementById('resultCount').innerHTML = `<b>${fmtInt(total)}</b> produtos encontrados`;
+  document.getElementById('tableBody').innerHTML = pageRecs.map(r=>{
+    const coverPct = r.cobertura===null ? 100 : Math.min(100, r.cobertura / (r.dias*1.5) * 100);
+    return `
+    <tr class="row-${r.classe==='CRIT'?'CRIT':''}">
+      <td>${GROUP_LABEL(r.grupo)}</td>
+      <td class="code">${r.codigo}</td>
+      <td class="desc">${r.descricao||'—'}</td>
+      <td class="num">${fmtInt(r.disponivel)}</td>
+      <td class="num">${fmtInt(r.minimo)}</td>
+      <td class="num">${fmtInt(r.comprado)}</td>
+      <td class="num">${fmtInt(r.previsto)}</td>
+      <td class="num">${vendaCellLabel(r.v90)}</td>
+      <td class="num">${vendaCellLabel(r.v180)}</td>
+      <td class="num">${vendaCellLabel(r.v360)}</td>
+      <td class="num">${fmtNum(r.vmd,2)}</td>
+      <td class="cover-cell">
+        ${coberturaLabel(r)}
+        <div class="cover-bar"><i style="width:${coverPct}%;background:${coverBarColor(r)}"></i></div>
+      </td>
+      <td class="num">${fmtInt(r.vendaEquiv)}</td>
+      <td class="num">${fmtInt(r.excessoQtd)}</td>
+      <td><span class="badge ${r.classe}">${CLASS_LABEL[r.classe]}</span></td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="15" class="empty-note">Nenhum produto encontrado com os filtros selecionados.</td></tr>`;
+
+  document.getElementById('pagerInfo').textContent = `Página ${currentPage} de ${totalPages}`;
+  document.getElementById('pgFirst').disabled = currentPage<=1;
+  document.getElementById('pgPrev').disabled = currentPage<=1;
+  document.getElementById('pgNext').disabled = currentPage>=totalPages;
+  document.getElementById('pgLast').disabled = currentPage>=totalPages;
+}
+
+document.getElementById('btnApply').addEventListener('click', applyFilters);
+['fCodigo','fDesc'].forEach(id=>{
+  document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') applyFilters(); });
+});
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  document.getElementById('fGrupo').value='TODOS';
+  document.getElementById('fClass').value='TODOS';
+  document.getElementById('fCodigo').value='';
+  document.getElementById('fDesc').value='';
+  document.getElementById('fEstMin').value='';
+  document.getElementById('fEstMax').value='';
+  document.getElementById('fVenda').value='TODOS';
+  document.getElementById('fExcesso').value='TODOS';
+  document.getElementById('fSort').value='estoque';
+  applyFilters();
+});
+document.getElementById('pgFirst').addEventListener('click',()=>{currentPage=1;renderTable();});
+document.getElementById('pgPrev').addEventListener('click',()=>{currentPage--;renderTable();});
+document.getElementById('pgNext').addEventListener('click',()=>{currentPage++;renderTable();});
+document.getElementById('pgLast').addEventListener('click',()=>{currentPage=Math.ceil(filteredRecords.length/PAGE_SIZE);renderTable();});
+
+/* =================================================================
+   10. UPLOAD DE NOVA PLANILHA
+   ================================================================= */
+document.getElementById('btnPickFile').addEventListener('click', ()=>document.getElementById('fileInput').click());
+document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+
+function normalizeHeader(h){ return (h||'').toString().trim().toLowerCase(); }
+
+function parseSheetToRows(ws){
+  const cm = CLIENT_CONFIG.columnMap;
+  const json = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+  if(!json.length) return [];
+  const headers = json[0].map(normalizeHeader);
+  const idx = name => headers.indexOf(normalizeHeader(name));
+  const iGrupo=idx(cm.grupo), iCod=idx(cm.codigo), iDesc=idx(cm.descricao), iDisp=idx(cm.disponivel),
+        iComp=idx(cm.comprado), iPrev=idx(cm.previsto), iMin=idx(cm.minimo),
+        iV90=idx(cm.venda90), iV180=idx(cm.venda180), iV360=idx(cm.venda360),
+        iExc=idx(cm.excessoOriginal), iVmd=idx(cm.vmd);
+
+  if([iGrupo,iCod,iDisp,iMin,iV90,iV180,iV360,iVmd].some(v=>v===-1)){
+    throw new Error('Colunas obrigatórias não encontradas. Verifique o cabeçalho da planilha.');
+  }
+
+  const rows = [];
+  for(let r=1;r<json.length;r++){
+    const row = json[r];
+    if(!row || (row[iCod]===null && row[iDesc]===null)) continue;
+    const numOrSV = v => (typeof v === 'number') ? v : 'SV';
+    rows.push([
+      (row[iGrupo]||'').toString().trim(),
+      row[iCod]!==null && row[iCod]!==undefined ? row[iCod].toString().trim() : '',
+      iDesc!==-1 && row[iDesc] ? row[iDesc].toString().trim() : '',
+      typeof row[iDisp]==='number'?row[iDisp]:0,
+      typeof row[iComp]==='number'?row[iComp]:0,
+      typeof row[iPrev]==='number'?row[iPrev]:0,
+      typeof row[iMin]==='number'?row[iMin]:0,
+      numOrSV(row[iV90]),
+      numOrSV(row[iV180]),
+      numOrSV(row[iV360]),
+      iExc!==-1 ? (row[iExc]||'') : '',
+      typeof row[iVmd]==='number'?row[iVmd]:0
+    ]);
+  }
+  return rows;
+}
+
+function handleFileUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('uploadStatus');
+  statusEl.className='upload-status';
+  statusEl.textContent = 'Lendo arquivo...';
+
+  if(typeof XLSX === 'undefined'){
+    statusEl.className='upload-status err';
+    statusEl.textContent = 'Erro: a biblioteca de leitura de planilhas não carregou (verifique sua conexão) e recarregue a página.';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      const data = new Uint8Array(evt.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const newDataset = {};
+      const sheetMap = {};
+      wb.SheetNames.forEach(name=>{
+        const cfg = groupConfigForSheet(name);
+        if(cfg) sheetMap[cfg.key] = name;
+      });
+      if(Object.keys(sheetMap).length===0){
+        const expected = CLIENT_CONFIG.groups.map(g=>g.sheetNames.join('/')).join(' ou ');
+        throw new Error(`Nenhuma aba (${expected}) encontrada no arquivo.`);
+      }
+      Object.keys(sheetMap).forEach(key=>{
+        newDataset[key] = parseSheetToRows(wb.Sheets[sheetMap[key]]);
+      });
+      CLIENT_CONFIG.groups.forEach(g=>{ if(!newDataset[g.key]) newDataset[g.key]=[]; });
+
+      loadDataset(newDataset);
+      document.getElementById('metaFileName').textContent = file.name;
+      document.getElementById('metaRowCount').textContent = fmtInt(ALL_RECORDS.length);
+      document.getElementById('metaDate').textContent = new Date().toLocaleDateString('pt-BR');
+      refreshAll();
+
+      const perGroupSummary = CLIENT_CONFIG.groups.map(g=>`${g.label}: ${newDataset[g.key].length}`).join(', ');
+      statusEl.className='upload-status ok';
+      statusEl.textContent = `Base atualizada com sucesso: ${fmtInt(ALL_RECORDS.length)} registros carregados (${perGroupSummary}).`;
+    }catch(err){
+      statusEl.className='upload-status err';
+      statusEl.textContent = 'Erro ao processar o arquivo: '+err.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* =================================================================
+   0b. VÍDEO DE FUNDO — institucional, em loop, com transparência
+   Reforça o autoplay/mute em navegadores mais restritivos (Safari
+   em especial exige muted+playsinline definidos também via JS) e
+   evita erro no console caso o navegador bloqueie o autoplay.
+   ================================================================= */
+(function initBackgroundVideo(){
+  const video = document.getElementById('bgVideo');
+  if(!video) return;
+  video.muted = true;
+  video.defaultMuted = true;
+  video.setAttribute('muted','');
+
+  const reduceMotion = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || false;
+  if(reduceMotion){
+    video.removeAttribute('autoplay');
+    video.pause();
+    return; // mantém o primeiro frame estático, sem reprodução
+  }
+
+  const tryPlay = () => {
+    const p = video.play();
+    if(p && typeof p.catch === 'function'){
+      p.catch(()=>{
+        // Autoplay bloqueado (ex.: economia de dados) — tenta novamente na primeira interação
+        const resume = () => { video.play().catch(()=>{}); };
+        document.addEventListener('click', resume, {once:true});
+        document.addEventListener('touchstart', resume, {once:true});
+      });
+    }
+  };
+  if(video.readyState >= 2) tryPlay();
+  else video.addEventListener('loadeddata', tryPlay, {once:true});
+})();
+
+/* =================================================================
+   11. INICIALIZAÇÃO
+   ================================================================= */
+function refreshAll(){
+  const totalK = computeKPIs(ALL_RECORDS);
+  document.getElementById('ovTotalTag').textContent = fmtInt(totalK.total)+' SKUs analisados';
+  renderKPIGrid('kpiTotalGrid', totalK);
+  renderKPIGrid('kpiPerfilGrid', computeKPIs(ALL_RECORDS.filter(r=>r.grupo===GROUP_A.key)));
+  renderKPIGrid('kpiFerragemGrid', computeKPIs(ALL_RECORDS.filter(r=>r.grupo===GROUP_B.key)));
+  try{ renderCharts(ALL_RECORDS); }catch(err){ console.error('Falha ao renderizar gráficos:', err); }
+  renderRankings(ALL_RECORDS);
+  renderPriority(document.querySelector('#priorityGroupToggle .pill.active')?.dataset.grp||'TODOS');
+  ALL_MODEL_GROUPS = buildModelGroups(ALL_RECORDS);
+  applyModelFilters();
+  applyFilters();
+}
+
+document.getElementById('metaRowCount').textContent = fmtInt(ALL_RECORDS.length);
+document.getElementById('metaDate').textContent = new Date().toLocaleDateString('pt-BR');
+applyClientConfigToUI();
+refreshAll();
+</script>
+</body>
+</html>
